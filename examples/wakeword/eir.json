@@ -1,0 +1,18 @@
+{
+  "version": "0.1.0",
+  "profile": "BASE",
+  "seed": 42,
+  "time": { "unit": "us", "mode": "fixed_step", "fixed_step_dt_us": 100, "epsilon_time_us": 100, "epsilon_numeric": 1e-5 },
+  "graph": { "name": "wakeword_kws" },
+  "nodes": [
+    { "id": "kws_frontend", "kind": "kernel", "op": "conv1d_events", "params": { "bands": 32, "stride": 1 } },
+    { "id": "kws_head", "kind": "spiking_neuron", "op": "lif", "params": { "size": 64, "tau_ms": 10.0, "v_th": 1.0 } },
+    { "id": "out", "kind": "probe", "params": { "target": "kws_head", "type": "spike" } }
+  ],
+  "edges": [
+    { "src": "kws_frontend", "dst": "kws_head", "weight": 0.2, "delay_us": 300 }
+  ],
+  "probes": [
+    { "id": "p_kws", "target": "kws_head", "type": "spike", "window_us": 0 }
+  ]
+}

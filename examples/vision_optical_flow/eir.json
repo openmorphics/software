@@ -1,0 +1,19 @@
+{
+  "version": "0.1.0",
+  "profile": "REALTIME",
+  "seed": 7,
+  "time": { "unit": "us", "mode": "exact_event", "epsilon_time_us": 50, "epsilon_numeric": 1e-5 },
+  "graph": { "name": "vision_optical_flow" },
+  "nodes": [
+    { "id": "flow", "kind": "kernel", "op": "optical_flow_events", "params": { "win_us": 5000 } },
+    { "id": "delay", "kind": "delay_line", "params": { "buf_us": 2000 } },
+    { "id": "probe_flow", "kind": "probe", "params": { "target": "flow", "type": "custom" } }
+  ],
+  "edges": [
+    { "src": "flow", "dst": "delay", "delay_us": 200 }
+  ],
+  "probes": [
+    { "id": "p_flow", "target": "flow", "type": "custom", "window_us": 10000 }
+  ],
+  "security": { "sandbox": true, "rate_limit_keps": 2000, "overflow_policy": "drop_tail" }
+}

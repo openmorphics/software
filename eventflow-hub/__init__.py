@@ -1,0 +1,3 @@
+"""
+EventFlow Hub client (stub)
+"""

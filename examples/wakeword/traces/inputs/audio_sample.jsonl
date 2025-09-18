@@ -1,0 +1,4 @@
+{"header":{"schema_version":"0.1.0","dims":["band"],"units":{"time":"ms","value":"dB"},"dtype":"f16","layout":"coo","metadata":{"sample_rate":16000,"window_ms":20}}}
+{"ts":0,"idx":[3],"val":-24.5}
+{"ts":20,"idx":[12],"val":-31.0}
+{"ts":40,"idx":[12],"val":-28.0}

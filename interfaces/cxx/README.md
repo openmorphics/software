@@ -1,0 +1,1 @@
+# C++ embedding interface (stub)

@@ -1,0 +1,4 @@
+{"header":{"schema_version":"0.1.0","dims":["axis"],"units":{"time":"ms","value":"dimensionless"},"dtype":"f32","layout":"coo","metadata":{"axes":["series0"]}}}
+{"ts":0,"idx":[0],"val":0.1}
+{"ts":100,"idx":[0],"val":0.2}
+{"ts":200,"idx":[0],"val":3.5}

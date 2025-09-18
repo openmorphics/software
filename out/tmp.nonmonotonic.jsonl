@@ -1,0 +1,3 @@
+{"header": {"schema_version": "0.1.0", "dims": ["band"], "units": {"time": "ms", "value": "dB"}, "dtype": "f16", "layout": "coo"}}
+{"ts": 20, "idx": [0], "val": 1.0}
+{"ts": 10, "idx": [0], "val": 1.0}

@@ -1,0 +1,18 @@
+{
+  "version": "0.1.0",
+  "profile": "BASE",
+  "seed": 99,
+  "time": { "unit": "ms", "mode": "fixed_step", "fixed_step_dt_us": 100000, "epsilon_time_us": 100, "epsilon_numeric": 1e-5 },
+  "graph": { "name": "anomaly_timeseries" },
+  "nodes": [
+    { "id": "win", "kind": "kernel", "op": "window_reduce_events", "params": { "window_ms": 500 } },
+    { "id": "det", "kind": "kernel", "op": "threshold_events", "params": { "thr": 3.0 } },
+    { "id": "out", "kind": "probe", "params": { "target": "det", "type": "custom" } }
+  ],
+  "edges": [
+    { "src": "win", "dst": "det", "delay_us": 0 }
+  ],
+  "probes": [
+    { "id": "p_det", "target": "det", "type": "custom", "window_us": 0 }
+  ]
+}

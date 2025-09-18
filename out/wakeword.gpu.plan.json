@@ -1,0 +1,76 @@
+{
+  "backend": {
+    "name": "gpu-sim",
+    "version": "0.1.0",
+    "mode": "fixed_step"
+  },
+  "graph": {
+    "id": "wakeword_kws",
+    "profile": "BASE",
+    "seed": 42
+  },
+  "partitions": [
+    {
+      "id": "p0",
+      "nodes": [
+        "kws_frontend",
+        "kws_head",
+        "out"
+      ],
+      "placement": {
+        "chip": 0,
+        "core": 0
+      },
+      "resources": {},
+      "emulated": false
+    }
+  ],
+  "schedule": [
+    {
+      "partition_id": "p0",
+      "policy": "fixed",
+      "dt_us": 100,
+      "priority": 0,
+      "affinity": 0
+    }
+  ],
+  "probes": [
+    {
+      "id": "p_kws",
+      "target": "kws_head",
+      "type": "spike",
+      "window_us": 0
+    }
+  ],
+  "epsilons": {
+    "time_us": 100,
+    "numeric": 1e-05
+  },
+  "warnings": [],
+  "capabilities": {
+    "device": {
+      "name": "gpu-sim",
+      "version": "0.1.0"
+    },
+    "supported_ops": [
+      "conv1d_events",
+      "conv2d_events",
+      "delay_line",
+      "lif",
+      "probe_spike",
+      "synapse_exp",
+      "threshold_events",
+      "window_reduce_events"
+    ],
+    "deterministic_modes": [
+      "exact_event",
+      "fixed_step"
+    ],
+    "conformance_profiles": [
+      "BASE",
+      "REALTIME"
+    ],
+    "emulated_nodes": []
+  },
+  "notes": "gpu-sim plan (deterministic executor with capability negotiation)"
+}

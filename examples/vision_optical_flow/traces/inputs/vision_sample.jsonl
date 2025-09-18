@@ -1,0 +1,4 @@
+{"header":{"schema_version":"0.1.0","dims":["x","y","polarity"],"units":{"time":"us","value":"dimensionless"},"dtype":"u8","layout":"coo","metadata":{"sensor":"dvs","width":346,"height":260}}}
+{"ts":100,"idx":[12,45,1],"val":1}
+{"ts":104,"idx":[12,45,0],"val":1}
+{"ts":133,"idx":[13,45,1],"val":1}
