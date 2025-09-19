@@ -1,0 +1,17 @@
+{
+  "source": "imu.6dof",
+  "out": "examples/anomaly_timeseries/traces/inputs/imu.norm.jsonl",
+  "counters": {
+    "produced": 30,
+    "dropped_head": 0,
+    "dropped_tail": 0,
+    "blocked_time_ms": 0,
+    "reordered": 0,
+    "anomalies_detected": 0
+  },
+  "sync": {
+    "drift_ppm": 0.0,
+    "jitter_ns": 0,
+    "last_sync_ts": 0
+  }
+}

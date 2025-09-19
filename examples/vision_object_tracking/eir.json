@@ -1,0 +1,15 @@
+{
+  "version": "0.1.0",
+  "profile": "REALTIME",
+  "seed": 6,
+  "time": { "unit": "us", "mode": "exact_event", "epsilon_time_us": 50, "epsilon_numeric": 1e-5 },
+  "graph": { "name": "vision_object_tracking" },
+  "nodes": [
+    { "id": "track", "kind": "kernel", "op": "object_tracking", "params": { "window_us": 20000 } },
+    { "id": "probe_track", "kind": "probe", "params": { "target": "track", "type": "custom" } }
+  ],
+  "edges": [],
+  "probes": [
+    { "id": "p_track", "target": "track", "type": "custom", "window_us": 20000 }
+  ]
+}

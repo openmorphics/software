@@ -1,0 +1,15 @@
+{
+  "version": "0.1.0",
+  "profile": "BASE",
+  "seed": 11,
+  "time": { "unit": "us", "mode": "exact_event", "epsilon_time_us": 100, "epsilon_numeric": 1e-5 },
+  "graph": { "name": "robotics_slam" },
+  "nodes": [
+    { "id": "slam", "kind": "kernel", "op": "event_slam", "params": { "window_us": 5000 } },
+    { "id": "probe_slam", "kind": "probe", "params": { "target": "slam", "type": "custom", "window_us": 0 } }
+  ],
+  "edges": [],
+  "probes": [
+    { "id": "p_slam", "target": "slam", "type": "custom", "window_us": 0 }
+  ]
+}

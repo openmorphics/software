@@ -1,3 +1,3 @@
-# EventFlow Backends — Registry and plugins (stubs)
+# EventFlow Backends
 
-Spec: [docs/BACKENDS.md](../docs/BACKENDS.md)
+Plugin registry and reference CPU simulator backend. Vendor backends are stubbed.

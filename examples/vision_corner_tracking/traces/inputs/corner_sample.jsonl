@@ -1,0 +1,6 @@
+{"header": {"schema_version": "0.1.0", "dims": ["x", "y", "polarity"], "units": {"time": "us", "value": "dimensionless"}, "dtype": "u8", "layout": "coo", "metadata": {"sensor": "dvs", "width": 8, "height": 8}}}
+{"ts": 0, "idx": [1, 2, 1], "val": 1}
+{"ts": 1000, "idx": [2, 2, 1], "val": 1}
+{"ts": 2000, "idx": [3, 2, 1], "val": 1}
+{"ts": 3000, "idx": [4, 2, 1], "val": 1}
+{"ts": 4000, "idx": [5, 2, 1], "val": 1}

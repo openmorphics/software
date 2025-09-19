@@ -35,7 +35,7 @@ Build a plan for cpu-sim:
 - python
   ef build --eir examples/wakeword/eir.json --backend cpu-sim --plan-out out/wakeword.plan.json
 
-Run and emit a golden trace:
+Run and emit a golden trace (inputs already normalized JSONL):
 - python
   ef run --eir examples/wakeword/eir.json \
          --backend cpu-sim \
@@ -47,10 +47,40 @@ Profile an Event Tensor JSONL (with JSON output):
 - python
   ef --json profile --path examples/wakeword/traces/inputs/audio_sample.jsonl
 
-SAL stream (normalize a WAV to band events with telemetry JSON):
+SAL + Run workflows (normalize → run → golden → compare)
+
+1) Vision (DVS JSONL → normalize → run)
 - python
-  ef --json sal-stream --uri "audio.mic://file?path=examples/wakeword/audio.wav&window_ms=20&hop_ms=10" \
+  ef --json sal-stream \
+     --uri "vision.dvs://file?format=jsonl&path=examples/vision_optical_flow/traces/inputs/vision_sample.jsonl" \
+     --out out/vision.norm.jsonl --telemetry-out out/vision.telemetry.json
+  ef run --eir examples/vision_optical_flow/eir.json \
+         --backend cpu-sim \
+         --input out/vision.norm.jsonl \
+         --trace-out out/vision.golden.jsonl
+  ef --json compare-traces --golden out/vision.golden.jsonl \
+                           --candidate out/vision.golden.jsonl \
+                           --eps-time-us 50 --eps-numeric 1e-5
+
+2) Audio (WAV → bands JSONL → run). If a WAV is not available, use the existing sample JSONL.
+- python
+  ef --json sal-stream \
+     --uri "audio.mic://file?path=examples/wakeword/audio.wav&window_ms=20&hop_ms=10&bands=32" \
      --out out/audio_bands.jsonl --telemetry-out out/audio_bands.telemetry.json
+  # or skip SAL and use the provided sample:
+  # ef run --eir examples/wakeword/eir.json --backend cpu-sim \
+  #        --input examples/wakeword/traces/inputs/audio_sample.jsonl \
+  #        --trace-out out/wakeword.golden.jsonl
+
+3) IMU (CSV → JSONL → run) — requires imu.6dof SAL (now supported)
+- python
+  ef --json sal-stream \
+     --uri "imu.6dof://file?path=examples/robotics_slam/traces/inputs/imu_sample.csv" \
+     --out out/imu.norm.jsonl --telemetry-out out/imu.telemetry.json
+  ef run --eir examples/anomaly_timeseries/eir.json \
+         --backend cpu-sim \
+         --input out/imu.norm.jsonl \
+         --trace-out out/imu.golden.jsonl
 
 Compare traces (golden vs candidate) with JSON output:
 - python

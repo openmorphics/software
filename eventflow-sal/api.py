@@ -121,6 +121,8 @@ def stream_to_jsonl(uri: str, out_path: str, **kwargs) -> Dict[str, Any]:
         tele = _stream_dvs_to_jsonl(params, out_path, cfg)
     elif scheme == "audio.mic":
         tele = _stream_audio_to_jsonl(params, out_path, cfg)
+    elif scheme == "imu.6dof":
+        tele = _stream_imu_to_jsonl(params, out_path, cfg)
     else:
         raise ValueError(f"SAL: unsupported source scheme '{scheme}'")
 
@@ -435,5 +437,60 @@ def _stream_audio_to_jsonl(params: Dict[str, str], out_path: str, cfg: SALConfig
             "anomalies_detected": anomalies_detected,
         },
         "sync": {"drift_ppm": 0.0, "jitter_ns": 0, "last_sync_ts": ts},
+    }
+    return telemetry
+
+def _stream_imu_to_jsonl(params: Dict[str, str], out_path: str, cfg: SALConfig) -> Dict[str, Any]:
+    """
+    Normalize a 6-DoF IMU CSV into Event Tensor JSONL.
+    CSV header expected: t_ns, ax, ay, az, gx, gy, gz
+    Emits one record per axis per timestamp with idx=[axis] where axis 0..5 corresponds to ax..gz.
+    """
+    path = params.get("path")
+    if not path:
+        raise ValueError("imu.6dof: missing 'path' parameter (CSV file)")
+
+    import csv
+
+    produced = 0
+    with open(out_path, "w", encoding="utf-8") as fout:
+        header = {
+            "schema_version": "0.1.0",
+            "dims": ["axis"],
+            "units": {"time": "ns", "value": "si"},
+            "dtype": "f32",
+            "layout": "coo",
+            "metadata": {"axes": ["ax","ay","az","gx","gy","gz"]},
+        }
+        _write_jsonl_header(fout, header)
+
+        with open(path, "r", encoding="utf-8") as fin:
+            reader = csv.DictReader(fin)
+            for row in reader:
+                t = int(row["t_ns"])
+                vals = [
+                    float(row.get("ax", 0.0)),
+                    float(row.get("ay", 0.0)),
+                    float(row.get("az", 0.0)),
+                    float(row.get("gx", 0.0)),
+                    float(row.get("gy", 0.0)),
+                    float(row.get("gz", 0.0)),
+                ]
+                for axis, v in enumerate(vals):
+                    _write_jsonl_record(fout, t, [axis], v)
+                    produced += 1
+
+    telemetry = {
+        "source": "imu.6dof",
+        "out": out_path,
+        "counters": {
+            "produced": produced,
+            "dropped_head": 0,
+            "dropped_tail": 0,
+            "blocked_time_ms": 0,
+            "reordered": 0,
+            "anomalies_detected": 0,
+        },
+        "sync": {"drift_ppm": 0.0, "jitter_ns": 0, "last_sync_ts": 0},
     }
     return telemetry

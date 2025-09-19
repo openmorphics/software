@@ -1,297 +1,383 @@
-# EventFlow SDK — Comprehensive Scaffold and Specifications v0.1
+# EventFlow: A Universal, Deterministic Event-Driven Computing SDK
 
-Status
-- Independent SDK. Do not integrate or depend on [../compiler](../compiler). Use it only as a conceptual reference.
-- Primary deliverable: complete scaffold and documentation with stubs for all layers. Deterministic execution and conformance are first-class.
+[![Build](https://img.shields.io/badge/build-GitHub%20Actions-blue?logo=github)](https://github.com/your-org/eventflow/actions)
+[![License](https://img.shields.io/badge/License-BSD--3--Clause-green.svg)](../LICENSE)
 
-Canonical documents
-- Overview and plan: [sdk.md](sdk.md)
-- This specification: [docs/README.md](docs/README.md)
-- Schemas to be authored later (referenced now for structure):
-  - EIR JSON Schema: [docs/specs/eir.schema.json](docs/specs/eir.schema.json)
-  - Event Tensor JSON Schema: [docs/specs/event_tensor.schema.json](docs/specs/event_tensor.schema.json)
-  - Device Capability Descriptor JSON Schema: [docs/specs/dcd.schema.json](docs/specs/dcd.schema.json)
-  - EFPKG Manifest Schema: [docs/specs/efpkg.schema.json](docs/specs/efpkg.schema.json)
+EventFlow is a modular, Python-first framework for neuromorphic and event-driven data processing that runs identically across heterogeneous hardware backends and sensor modalities. It provides:
 
-Repository scaffold (proposed)
+- A thin-waist Event Intermediate Representation (EIR) for portable, deterministic execution.
+- A Sensor Abstraction Layer (SAL) that unifies event sensors including DVS cameras, event microphones, tactile arrays, and IMUs.
+- A Spiking Graph API with neuromorphic primitives (spiking neurons, plastic synapses, delays, and hypergraphs).
+- Cross-backend compilation and deterministic replay of execution traces with conformance validation.
+- Software fallback and graceful degradation when hardware features are unavailable.
+
+This document is the top-level guide to the EventFlow ecosystem: architecture, packages, installation, quick start, API docs, development, testing, contributions, roadmap, and troubleshooting.
+
+---
+
+## Contents
+
+- Overview
+- Architecture
+- Packages
+- Installation
+- Quick Start
+- API Documentation
+- Development Guide
+- Testing
+- Contributing
+- Roadmap
+- Troubleshooting
+- License
+
+---
+
+## Overview
+
+EventFlow enables writing event-driven applications once and running them anywhere:
+
+- Across any neuromorphic chip (e.g., Intel Loihi, SpiNNaker, SynSense, custom ASIC).
+- Across software backends (high-accuracy CPU and GPU simulators).
+- Across event-based sensors (DVS, audio, tactile, IMU), with unified bindings.
+- With deterministic time semantics, unit-checked temporal operations, and bit-exact replay under standardized tolerances.
+
+Core properties:
+
+- Determinism: Canonical event ordering, seeded randomness policy, consistent unit systems, and trace equivalence tooling.
+- Portability: Target-independent EIR, capability negotiation, and automatic emulation fallback where necessary.
+- Productivity: Batteries-included modules for vision/audio/robotics/timeseries/wellness/creative domains.
+- Operability: Conformance tests, profiling, packaging, model hub, and CLI.
+
+---
+
+## Architecture
+
+High-level layers:
+
+1) Applications
+   - Compose spiking graphs using domain modules; bind to sensors via SAL.
+2) EventFlow Core (Thin Waist)
+   - EIR (Event Intermediate Representation)
+   - Compiler/Planner (capability negotiation, schedule planning)
+   - Runtime (event-driven and fixed-Δt executors)
+   - Conformance (trace capture, comparison, metrics)
+3) Backends
+   - Vendor plugins (Loihi/Lava, SpiNNaker, SynSense, BrainScaleS)
+   - CPU/GPU simulators (timing-accurate, deterministic)
+4) SAL (Sensor Abstraction Layer)
+   - Uniform packet format, replay/stream APIs, clock sync, rate limiting, spoof detection
+5) Hub (Model/Artifact Registry)
+   - Packaging, capability manifests, golden traces, compatibility matrices
+
+Key abstractions:
+
+- Event Tensor: Sparse event streams over arbitrary dimensions with temporal windowing and efficient serialization.
+- Spiking Graph: Declarative pipelines with neurons/synapses/delays and hypergraph connectivity.
+- Device Capability Descriptors (DCD): JSON/Schema described device capabilities for negotiation and planning.
+- EIR Packages (EFPKG): Self-contained deployables (EIR bytecode, capabilities, golden traces, version metadata).
+
+---
+
+## Packages
+
+The EventFlow ecosystem is split into modular Python distributions:
+
+- eventflow-core
+  - EIR types/serialization
+  - Compiler/planner and runtime executors
+  - Conformance testing (trace/metrics)
+  - Documentation: See the package README
+
+- eventflow-sal (Sensor Abstraction Layer)
+  - Canonical event packet formats
+  - Source registry (DVS/audio/IMU/tactile)
+  - Clock sync, telemetry, rate limiting, spoof detection
+  - Documentation: See the package README
+
+- eventflow-modules
+  - Domain modules for vision, audio, robotics, time series, wellness, and creative
+  - Provide reusable EIR graph fragments and operators
+  - Documentation: See the package README
+
+- eventflow-backends
+  - Backend plugin API and registry
+  - CPU simulator backend (runnable reference)
+  - Vendor backends as structured stubs
+  - Documentation: See the package README
+
+- eventflow-cli
+  - Command-line interface for build, run, profile, validate
+  - Integrates core/backends/hub workflows
+  - Documentation: See the package README
+
+- eventflow-hub
+  - Local model/artifact registry
+  - Packing/unpacking of deployable bundles
+  - Future: remote hub client
+  - Documentation: See the package README
+
+Direct links to package docs:
+- eventflow-core: ../eventflow-core/README.md
+- eventflow-sal: ../eventflow-sal/README.md
+- eventflow-modules: ../eventflow-modules/README.md
+- eventflow-backends: ../eventflow-backends/README.md
+- eventflow-cli: ../eventflow-cli/README.md
+- eventflow-hub: ../eventflow-hub/README.md
+
+---
+
+## Installation
+
+Requirements:
+- Python 3.11+
+- macOS/Linux (Windows via WSL recommended)
+- Optional: CUDA-capable GPU for gpu-sim backends (future)
+- Optional: Vendor SDKs (e.g., Lava/Loihi) for specific hardware backends
+
+Recommended: Create a virtual environment:
 
 ```
-eventflow/
-├── eventflow-core/               # Python package: EIR, Event Tensor, graph API, runtime, fallback, conformance
-│   ├── eir/                      # EIR types and validation (pure Python + JSON Schema)
-│   ├── graph/                    # Spiking Graph API and ops
-│   ├── runtime/                  # Deterministic scheduler, seeds, trace recorder
-│   ├── event_tensor/             # Sparse tensor type, windowing, serialization
-│   ├── fallback/                 # Software emulation of unsupported features
-│   ├── conformance/              # Trace equivalence, benchmark harness
-│   └── __init__.py
-├── eventflow-sal/                # Python package: Sensor Abstraction Layer
-│   ├── drivers/                  # dvs/, audio/, imu/, tactile/, bio/
-│   ├── formats/                  # AEDAT reader, JSONL streams
-│   ├── sync/                     # clock sync, rate limiting, spoofing detection
-│   └── __init__.py
-├── eventflow-backends/           # Python package: backend registry and plugins
-│   ├── registry/                 # discovery, capability negotiation
-│   ├── cpu_sim/                  # reference simulator (deterministic)
-│   ├── gpu_sim/                  # optional accelerated simulator (feature-flag)
-│   ├── vendor/                   # plugin interface and stubs (no vendor code required)
-│   └── __init__.py
-├── eventflow-cli/                # Python package: ef CLI
-│   └── ef.py
-├── eventflow-modules/            # Domain libraries (Python)
-│   ├── vision/
-│   ├── audio/
-│   ├── robotics/
-│   ├── timeseries/
-│   ├── wellness/
-│   └── creative/
-├── eventflow-hub/                # Local registry client, packaging, compatibility matrices
-├── interfaces/
-│   ├── cxx/                      # C++ headers for embedding (optional)
-│   ├── rpc/                      # gRPC protobufs and service stubs (optional)
-│   └── rest/                     # OpenAPI spec (optional)
-├── docs/                         # Specifications and guides (this file)
-├── examples/                     # End-to-end sample apps and datasets pointers
-├── tests/                        # Unit, integration, conformance
-└── tools/                        # Dev utilities
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
 ```
 
-Architecture thin waist
+Install individual packages (editable dev mode):
 
-Mermaid
-
-flowchart TD
-A[Apps Python API] --> B[SAL]
-A --> C[Spiking Graph API]
-B --> D[EIR units determinism]
-C --> D
-D --> E[Passes and rewrites]
-E --> F[Backend registry]
-F --> G[Vendor plugins]
-F --> H[CPU GPU simulators]
-E --> I[Packager EFPKG]
-G --> J[Hardware]
-H --> K[Deterministic simulator]
-E --> L[Conformance]
-K --> L
-J --> L
-
-Event Intermediate Representation EIR (overview)
-
-Goals
-- Hardware-agnostic, sensor-agnostic representation of event-driven graphs
-- Unit-checked temporal semantics with deterministic execution modes
-- Extensible opset covering neuron models, synapses, delays, plasticity, domain kernels
-
-Core graph entities
-- graph: name, metadata, attributes
-- node: type, parameters, state, timing_constraints
-- edge: connectivity, delay, weight, plasticity
-- probe: named measurement channels
-
-Determinism and time
-- modes: exact_event and fixed_step
-- time_unit: ns us ms
-- tolerances: epsilon_time_us, epsilon_numeric
-- canonical_order: tie-break by channel, spatial idx, ingestion order
-
-JSON Schema skeleton (to be split into [docs/specs/eir.schema.json](docs/specs/eir.schema.json))
-
-```json
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "EventFlow EIR",
-  "type": "object",
-  "required": ["version", "graph", "nodes", "edges", "time"],
-  "properties": {
-    "version": { "type": "string" },
-    "profile": { "enum": ["BASE", "REALTIME", "LEARNING", "LOWPOWER"] },
-    "time": {
-      "type": "object",
-      "properties": {
-        "unit": { "enum": ["ns", "us", "ms"] },
-        "mode": { "enum": ["exact_event", "fixed_step"] },
-        "fixed_step_dt_us": { "type": "integer", "minimum": 1 },
-        "epsilon_time_us": { "type": "integer", "minimum": 0 },
-        "epsilon_numeric": { "type": "number", "minimum": 0 }
-      },
-      "required": ["unit", "mode"]
-    },
-    "graph": {
-      "type": "object",
-      "properties": {
-        "name": { "type": "string" },
-        "attributes": { "type": "object" }
-      },
-      "required": ["name"]
-    },
-    "nodes": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "properties": {
-          "id": { "type": "string" },
-          "kind": { "type": "string" },
-          "params": { "type": "object" },
-          "state": { "type": "object" },
-          "timing_constraints": { "type": "object" }
-        },
-        "required": ["id", "kind"]
-      }
-    },
-    "edges": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "properties": {
-          "src": { "type": "string" },
-          "dst": { "type": "string" },
-          "weight": { "type": "number" },
-          "delay_us": { "type": "integer", "minimum": 0 },
-          "plasticity": { "type": "object" }
-        },
-        "required": ["src", "dst"]
-      }
-    },
-    "probes": {
-      "type": "array",
-      "items": { "type": "string" }
-    },
-    "metadata": { "type": "object" }
-  }
-}
+```
+pip install -e ./eventflow-core
+pip install -e ./eventflow-sal
+pip install -e ./eventflow-modules
+pip install -e ./eventflow-backends
+pip install -e ./eventflow-cli
+pip install -e ./eventflow-hub
 ```
 
-Event Tensor (overview)
+Full ecosystem (monorepo dev):
 
-Purpose
-- Sparse, asynchronous event stream datatype with units and dimensionality
-- Optimized for windowing, fusion, and serialization
-
-Schema skeleton (to be split into [docs/specs/event_tensor.schema.json](docs/specs/event_tensor.schema.json))
-
-```json
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "EventFlow Event Tensor",
-  "type": "object",
-  "required": ["header", "records"],
-  "properties": {
-    "header": {
-      "type": "object",
-      "properties": {
-        "schema_version": { "type": "string" },
-        "dims": { "type": "array", "items": { "type": "string" } },
-        "units": {
-          "type": "object",
-          "properties": { "time": { "enum": ["ns", "us", "ms"] }, "value": { "type": "string" } }
-        },
-        "dtype": { "enum": ["f32", "f16", "i16", "u8"] },
-        "layout": { "enum": ["coo", "block"] },
-        "metadata": { "type": "object" }
-      },
-      "required": ["schema_version", "dims", "units", "dtype", "layout"]
-    },
-    "records": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "properties": {
-          "ts": { "type": "integer", "minimum": 0 },
-          "idx": { "type": "array", "items": { "type": "integer", "minimum": 0 } },
-          "val": { "type": "number" }
-        },
-        "required": ["ts", "idx", "val"]
-      }
-    }
-  }
-}
+```
+pip install -e ./eventflow-core ./eventflow-sal ./eventflow-modules ./eventflow-backends ./eventflow-cli ./eventflow-hub
 ```
 
-Device Capability Descriptor DCD (overview)
+---
 
-Purpose
-- Declare backend capabilities, constraints, deterministic modes, timing granularity, memory budgets, and power model hooks
+## Quick Start
 
-Schema skeleton (to be split into [docs/specs/dcd.schema.json](docs/specs/dcd.schema.json))
+1) Build a minimal bundle
+- Create a trivial EIR file (JSON or serialized form). For early smoke tests you can use an empty JSON as a placeholder while wiring real graphs.
 
-```json
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "EventFlow DCD",
-  "type": "object",
-  "required": ["name", "vendor", "family", "version", "time_resolution_ns", "deterministic_modes", "supported_ops"],
-  "properties": {
-    "name": { "type": "string" },
-    "vendor": { "type": "string" },
-    "family": { "type": "string" },
-    "version": { "type": "string" },
-    "time_resolution_ns": { "type": "integer", "minimum": 1 },
-    "max_jitter_ns": { "type": "integer", "minimum": 0 },
-    "deterministic_modes": { "type": "array", "items": { "enum": ["exact_event", "fixed_step"] } },
-    "supported_ops": { "type": "array", "items": { "type": "string" } },
-    "neuron_models": { "type": "array", "items": { "type": "string" } },
-    "plasticity_rules": { "type": "array", "items": { "type": "string" } },
-    "weight_precisions_bits": { "type": "array", "items": { "type": "integer" } },
-    "max_neurons": { "type": "integer", "minimum": 1 },
-    "max_synapses": { "type": "integer", "minimum": 1 },
-    "max_fanout": { "type": "integer", "minimum": 1 },
-    "memory": { "type": "object" },
-    "routing": { "type": "object" },
-    "power": { "type": "object" },
-    "overflow_behavior": { "enum": ["drop_head", "drop_tail", "block"] },
-    "conformance_profiles": { "type": "array", "items": { "enum": ["BASE", "REALTIME", "LEARNING", "LOWPOWER"] } }
-  }
-}
+```
+mkdir -p build
+eventflow build --model path/to/model.eir --out build/
 ```
 
-Deterministic runtime scheduler (overview)
+Outputs:
+- build/model.eir
+- build/cap.json
+- build/card.json
+- build/trace.json
 
-Modes
-- exact_event: strict timestamp order; tie-break on channel, idx, ingestion
-- fixed_step: discretize by dt; track quantization error and ensure bounded drift
+2) Run on CPU simulator
 
-Replay
-- Global 64-bit seed; capture and replay golden traces; epsilon-based equivalence checker
+```
+eventflow run --bundle build/ --backend cpu_sim
+```
 
-Sensor Abstraction Layer SAL (overview)
-- Normalize vendor streams to Event Tensor
-- Clock sync and drift correction
-- Rate limiting, overflow policies, spoofing detection
-- v0.1 drivers: DVS playback (AEDAT), microphone encoder (band events)
+The CPU simulator provides deterministic synthetic inputs (until you supply real inputs via SAL or programmatically through eventflow-core).
 
-Backend architecture (overview)
-- Backend registry and auto-selection by DCD
-- CPU-sim as reference default; GPU-sim optional
-- Vendor plugin interface without any vendor code in-tree
+3) Profile latency
 
-Conformance and QA (overview)
-- Trace Equivalence Suite: compare outputs to golden trace with epsilon bounds
-- Benchmarks: latency P50 P99, throughput, dropped rate, power proxy
+```
+eventflow profile --bundle build/ --backend cpu_sim
+```
 
-Packaging EFPKG (overview)
-- manifest.yaml, eir.json, dcd.requirements.json, golden.trace.jsonl, profile.baseline.jsonl
-- Semantic versioning and feature flags with compatibility matrices
+Reports approximate runtime metrics (latency; energy placeholder).
 
-CLI (overview)
-- ef build, ef run, ef profile, ef validate, ef package
-- Consistent outputs and JSONL telemetry
+4) Validate against a golden trace
 
-Domain modules and examples (overview)
-- Vision: optical flow, corners, object tracking, gestures
-- Audio: VAD, KWS, spatial localization
-- Robotics: reflex, SLAM primitives, obstacle avoidance
-- Time series: anomaly detection, change-point, adaptive forecasting
-- Wellness: HRV, sleep segmentation, stress detection
-- Creative: bio-adaptive sequencing, generative graphics
-- Examples: wake word, optical flow + gesture fusion, anomaly detection, drone loop, finance predictor, wearable HRV
+```
+eventflow validate --bundle build/ --golden path/to/golden_trace.json
+```
 
-Governance and roadmap
-- License: permissive for core SDK; enterprise plugins may be commercial
-- Conformance badges and open model hub
-- Roadmap phases v0.1 core SDK, v0.2 vendor adapters, v0.3 cloud deployment
+Checks trace equivalence with specified tolerances (wired in eventflow-core conformance tools).
 
-Next steps
-- Accept this scaffold and generate initial directories and stub files
-- Author schemas under docs/specs and wire ef CLI doc strings to behaviors
-- Populate examples and conformance datasets
+5) Stream from a sensor (SAL)
+- See eventflow-sal README for streaming and replay examples. The SAL normalizes real sensor events to EventFlow packets, enabling identical pipeline behavior across simulated and physical sources.
+
+---
+
+## API Documentation
+
+High-level structure:
+
+- eventflow-core
+  - eir.types, eir.ops, eir.graph, eir.serialize
+  - runtime.exec (event-driven and fixed-Δt)
+  - conformance.compare (trace equivalence)
+  - validators (EIR/Event Tensor/DCD/EFPKG)
+
+- eventflow-sal
+  - api.packet (EventPacket constructors for DVS/audio/IMU/tactile)
+  - api.source (BaseSource/Replayable)
+  - api.dcd (DeviceCapabilityDescriptor, validation)
+  - api.uri (parse_sensor_uri)
+  - registry (driver resolution)
+  - sync (clock, watermark)
+  - calib (calibration hooks)
+  - drivers (DVS, WAV/audio, IMU/CSV, tactile)
+
+- eventflow-modules
+  - vision (optical flow, corners, gestures, tracking)
+  - audio (VAD, KWS, diarization, localization)
+  - robotics (reflex, SLAM, obstacle avoidance, motor control)
+  - timeseries (anomaly, pattern mining, change-point, forecasting)
+  - wellness (HRV, sleep, stress)
+  - creative (bio-adaptive music, generative graphics)
+
+- eventflow-backends
+  - api (Backend interface, DCD)
+  - registry and vendor backends
+  - cpu_sim backend uses eventflow-core runtime
+
+- eventflow-hub
+  - schemas (ModelCard, CapManifest, TraceMeta)
+  - pack/unpack (tar.gz bundles)
+  - registry (local filesystem index)
+  - client (local and future remote hub)
+
+Each package’s README contains deeper details and examples.
+
+---
+
+## Development Guide
+
+- Python 3.11+ required
+- Style: PEP8, type hints encouraged
+- License: BSD-3-Clause
+- Virtual environment recommended (see Installation)
+
+Repository layout (monorepo):
+
+```
+eventflow-core/
+eventflow-sal/
+eventflow-modules/
+eventflow-backends/
+eventflow-cli/
+eventflow-hub/
+docs/
+```
+
+Editable installation for local development:
+
+```
+pip install -e ./eventflow-core ./eventflow-sal ./eventflow-modules ./eventflow-backends ./eventflow-cli ./eventflow-hub
+```
+
+Run unit tests (per package):
+
+```
+python -m unittest discover -s eventflow-core/tests
+python -m unittest discover -s eventflow-sal/tests
+python -m unittest discover -s eventflow-backends/tests
+python -m unittest discover -s eventflow-cli/tests
+python -m unittest discover -s eventflow-hub/tests
+python -m unittest discover -s eventflow-modules/tests  # as tests are added
+```
+
+---
+
+## Testing
+
+Testing layers:
+
+- Unit tests
+  - Validators (EIR/Event Tensor/DCD/EFPKG)
+  - SAL packet/URI parsing, replay determinism
+  - Backend registry and CPU simulator
+  - CLI smoke tests
+
+- Integration tests (as implemented)
+  - SAL→core runtime graphs
+  - Multi-backend conformance with golden traces
+  - Packaging and registry round-trips
+
+- Conformance harness (planned)
+  - Automated cross-backend runs, metrics aggregation, report/badge generation
+
+Run all tests (example):
+
+```
+pytest  # if using pytest
+# or:
+python -m unittest discover
+```
+
+---
+
+## Contributing
+
+We welcome contributions! Please:
+
+- File issues describing bugs/feature requests.
+- Open PRs with:
+  - Tests covering new functionality
+  - Documentation updates (README, docs/)
+  - Adherence to determinism and portability constraints
+- Code style: PEP8; include type hints and docstrings.
+- CI: Ensure unit tests pass; add coverage for new code paths.
+- Security: Avoid unsafe eval/imports; validate inputs; keep sandboxes in mind for untrusted kernels.
+
+Roadmap items are tagged in issues; feel free to pick “good first issue” labels.
+
+---
+
+## Roadmap (Highlights)
+
+- Backend capability negotiation (expanded)
+  - Profile gating, time quantization checks, overflow policies, emulated ops reporting
+- Deterministic schedulers
+  - Exact-event and fixed-Δt with delay lines, LIF, plasticity primitives
+- Full conformance harness CLI
+  - Multi-backend orchestration, latency/power/drops metrics, badges
+- SAL enhancements
+  - Clock drift/jitter modeling, telemetry, spoofing detection, rate limiting
+- EFPKG finalization
+  - Hashes, sizes, validate-all workflow
+- Domain modules
+  - End-to-end examples across vision/audio/robotics/timeseries/wellness/creative
+- Security sandboxing
+  - Resource limits; kernel isolation; policy surfaces via CLI
+- Cloud/distribution integrations
+  - gRPC/REST services, ONNX interop, container orchestration
+
+---
+
+## Troubleshooting
+
+- ImportErrors with CLI or backends:
+  - Ensure packages are installed in the same environment: `pip install -e ./eventflow-...`
+  - Verify `python -c "import eventflow_core; import eventflow_backends"` works.
+
+- CLI “run/profile/validate” fails on model load:
+  - Confirm `build/model.eir` exists and is valid.
+  - Ensure eventflow-core is installed; backends lazily import core on demand.
+
+- SAL replay produces no events:
+  - Check the file format and driver selection (e.g., `.aedat4` for DVS, `.wav` for audio, `.csv` for IMU).
+  - Use SAL telemetry/debug mode as documented in eventflow-sal/README.
+
+- Non-deterministic traces:
+  - Check epsilon configuration in conformance tools.
+  - Ensure fixed seeds for any stochastic components.
+  - Confirm backend time resolution meets epsilon_time_ns constraints.
+
+- Backend unsupported features:
+  - Planner will emulate unsupported operations in software with a warning.
+  - Review the Device Capability Descriptor (DCD) and adjust profiles or constraints.
+
+---
+
+## License
+
+BSD-3-Clause. See ../LICENSE.

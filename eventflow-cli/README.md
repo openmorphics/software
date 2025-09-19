@@ -1,3 +1,2 @@
-# EventFlow CLI (ef) — stub
-
-Spec: [docs/CLI.md](../docs/CLI.md)
+# EventFlow CLI
+Build, run, profile, and validate EventFlow bundles.

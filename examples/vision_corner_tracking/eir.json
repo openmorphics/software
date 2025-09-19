@@ -1,0 +1,15 @@
+{
+  "version": "0.1.0",
+  "profile": "REALTIME",
+  "seed": 5,
+  "time": { "unit": "us", "mode": "exact_event", "epsilon_time_us": 50, "epsilon_numeric": 1e-5 },
+  "graph": { "name": "vision_corner_tracking" },
+  "nodes": [
+    { "id": "corners", "kind": "kernel", "op": "corner_tracking", "params": { "window_us": 5000 } },
+    { "id": "probe_corners", "kind": "probe", "params": { "target": "corners", "type": "custom" } }
+  ],
+  "edges": [],
+  "probes": [
+    { "id": "p_corners", "target": "corners", "type": "custom", "window_us": 10000 }
+  ]
+}
