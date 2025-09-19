@@ -15,7 +15,7 @@ def handle(ns):
         with open(ns.model, "r") as f_in, open(os.path.join(ns.out, "model.eir"), "w") as f_out:
             f_out.write(f_in.read())
     else:
-        raise NotImplementedError("Python builder import not implemented")
+        raise RuntimeError("builder.unsupported: only .eir JSON models are supported in v0.1; use --model path/to/model.eir")
 
     cap = {"profiles": ns.profiles.split(","), "min_caps": {"neurons": ">=0"}}
     with open(os.path.join(ns.out,"cap.json"),"w") as f: json.dump(cap, f, indent=2)

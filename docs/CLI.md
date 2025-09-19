@@ -1,6 +1,6 @@
 # EventFlow CLI — Specification v0.1
 
-This document describes the EventFlow CLI entrypoints provided by the scaffold in [`python.main()`](eventflow-cli/ef.py:476).
+This document describes the EventFlow CLI entrypoints provided by the CLI entrypoint [`ef.py`](eventflow-cli/ef.py).
 
 Commands (v0.1)
 - list-backends: enumerate available backends (from eventflow-backends)
@@ -15,9 +15,9 @@ Commands (v0.1)
 - Global flag: --json to emit machine-readable output where supported (validators, compare-traces, profile, sal-stream)
 
 Notes
-- Backends are discovered via [`python.list_backends()`](eventflow-cli/ef.py:131) which proxies to the registry at [`python.list_backends()`](eventflow-backends/registry/registry.py:77).
-- Planning and running routes through the backend registry via [`python.cmd_build()`](eventflow-cli/ef.py:394) and [`python.cmd_run()`](eventflow-cli/ef.py:425).
-- Deterministic comparison utilities are implemented in [`python.compare_traces_jsonl()`](eventflow-core/conformance/comparator.py:60).
+- Backends are discovered via the registry at [registry.py](eventflow-backends/registry/registry.py).
+- Planning and running route through the backend registry via [ef.py](eventflow-cli/ef.py).
+- Deterministic comparison utilities are implemented in [comparator.py](eventflow-core/conformance/comparator.py).
 
 Examples
 

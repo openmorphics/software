@@ -7,7 +7,11 @@ from ..eir.ops import Event
 def run_event_mode(g: EIRGraph, inputs: Dict[str, Iterator[Event]]) -> Dict[str, List[Event]]:
     topo, exec_nodes = g.topo(), build_exec_nodes(g)
     upstream: Dict[str, Dict[str, Iterator[Event]]] = {nid:{"in":iter([]),"pre":iter([]),"a":iter([]),"b":iter([])} for nid in g.nodes}
-    for name,it in inputs.items(): upstream[name]={"in":it}
+    for name, it in inputs.items():
+        if name in upstream:
+            upstream[name]["in"] = it
+        else:
+            upstream[name] = {"in": it}
     sinks: Dict[str,list] = {nid:[] for nid in g.nodes}; [sinks[e.src[0]].append(e.dst) for e in g.edges]
     outputs: Dict[str, List[Event]] = {nid:[] for nid in g.nodes}
 
@@ -23,8 +27,27 @@ def run_event_mode(g: EIRGraph, inputs: Dict[str, Iterator[Event]]) -> Dict[str,
     return outputs
 
 def run_fixed_dt(g: EIRGraph, inputs: Dict[str, Iterator[Event]], dt_ns: int) -> Dict[str, List[Event]]:
+    """
+    Execute an EIRGraph in fixed-step mode by bucketing input streams.
+
+    Each bucket aggregates events within [k*dt, (k+1)*dt) and emits one event
+    at the bucket boundary time (k+1)*dt with the aggregated value.
+
+    Args:
+        g: Parsed EIRGraph.
+        inputs: Mapping of node-id to input iterators.
+        dt_ns: Fixed step in nanoseconds.
+
+    Returns:
+        Dict mapping node-id to list of output events for that node.
+    """
     import itertools
-    def bucket(it:Iterator[Event]):
-        for key, bucket in itertools.groupby(it, key=lambda e: (e[0]//dt_ns)*dt_ns):
-            yield (key+dt_ns, 0, sum(ev[2] for ev in bucket), {"unit":"bucket"})
-    return run_event_mode(g, {k: bucket(v) for k,v in inputs.items()})
+
+    def bucket(it: Iterator[Event]):
+        for key, group in itertools.groupby(it, key=lambda e: (e[0] // dt_ns) * dt_ns):
+            total = 0.0
+            for ev in group:
+                total += ev[2]
+            yield (key + dt_ns, 0, total, {"unit": "bucket"})
+
+    return run_event_mode(g, {k: bucket(v) for k, v in inputs.items()})

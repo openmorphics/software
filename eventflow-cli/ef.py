@@ -166,18 +166,24 @@ def _read_json(path: str) -> Any:
 # ------------------------------------------------------------
 
 def cmd_version(_args: argparse.Namespace) -> None:
-    print("EventFlow SDK v0.1.0")
+    if "CLI_JSON" in globals() and globals().get("CLI_JSON"):
+        print(json.dumps({"version": "0.1.0"}))
+    else:
+        print("EventFlow SDK v0.1.0")
 
 
 def cmd_list_backends(_args: argparse.Namespace) -> None:
     try:
         reg = _load_backend_registry()
-        for name in reg.list_backends():
-            print(name)
+        names = list(reg.list_backends())
     except SystemExit:
         # registry missing; fall back
-        print("cpu-sim")
-        print("gpu-sim")
+        names = ["cpu-sim", "gpu-sim"]
+    if "CLI_JSON" in globals() and globals().get("CLI_JSON"):
+        print(json.dumps({"backends": names}, indent=2))
+    else:
+        for n in names:
+            print(n)
 
 # ------------------------------------------------------------
 # Validators (Phase 1)
@@ -483,7 +489,10 @@ def cmd_package(args: argparse.Namespace) -> None:
         sys.exit(1)
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump(man, f, indent=2)
-    print(f"manifest written: {out_path}")
+    if "CLI_JSON" in globals() and globals().get("CLI_JSON"):
+        print(json.dumps({"manifest": out_path, "artifacts": man.get("artifacts", {})}, indent=2))
+    else:
+        print(f"manifest written: {out_path}")
     sys.exit(0)
 
 # ------------------------------------------------------------
@@ -601,14 +610,15 @@ def main() -> None:
     s.add_argument("--path", required=True, help="Path to DCD JSON")
     s.set_defaults(func=cmd_validate_dcd)
 
-    s = sub.add_parser("validate-efpkg", help="Validate an EventFlow package manifest and referenced artifacts")
+    se = sub.add_parser("validate-efpkg", help="Validate an EventFlow package manifest and referenced artifacts")
+    se.add_argument("--manifest", required=True, help="Path to EFPKG manifest (JSON or YAML-as-JSON)")
+    se.add_argument("--root", required=False, help="Root directory for relative artifact paths (default: manifest dir)")
+    se.set_defaults(func=cmd_validate_efpkg)
+
     # Validate Event Tensor JSONL trace (header + records)
-    s = sub.add_parser("validate-trace", help="Validate an Event Tensor JSONL trace")
-    s.add_argument("--path", required=True, help="Path to Event Tensor JSONL")
-    s.set_defaults(func=cmd_validate_trace)
-    s.add_argument("--manifest", required=True, help="Path to EFPKG manifest (JSON or YAML-as-JSON)")
-    s.add_argument("--root", required=False, help="Root directory for relative artifact paths (default: manifest dir)")
-    s.set_defaults(func=cmd_validate_efpkg)
+    st = sub.add_parser("validate-trace", help="Validate an Event Tensor JSONL trace")
+    st.add_argument("--path", required=True, help="Path to Event Tensor JSONL")
+    st.set_defaults(func=cmd_validate_trace)
 
     # SAL streaming
     s = sub.add_parser("sal-stream", help="Normalize a SAL URI source to Event Tensor JSONL")

@@ -2,17 +2,19 @@ from __future__ import annotations
 from typing import Dict
 from .api import Backend
 from .cpu_sim.backend import CPUSimBackend
-from .lava.backend import LavaBackend
-from .spinnaker2.backend import SpiNNaker2Backend
-from .synsense.backend import SynSenseBackend
-from .brainscales.backend import BrainScaleSBackend
+
+"""
+Minimal in-process backend registry.
+
+Note:
+- Vendor backends (lava/loihi, spinnaker2, synsense, brainscales) are available as stubs in this repo
+  but are not registered here to avoid import-time side effects and NotImplementedError placeholders.
+- Use the dynamic registry (eventflow-backends/registry/registry.py) for planning/execution workflows.
+"""
 
 _REG: Dict[str, Backend] = {
     "cpu_sim": CPUSimBackend(),
-    "lava": LavaBackend(),
-    "spinnaker2": SpiNNaker2Backend(),
-    "synsense": SynSenseBackend(),
-    "brainscales": BrainScaleSBackend(),
+    "cpu-sim": CPUSimBackend(),  # alias for hyphenated id
 }
 
 def get_backend(backend_id: str) -> Backend:

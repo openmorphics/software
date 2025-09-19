@@ -1,17 +1,18 @@
 from __future__ import annotations
 from typing import Optional, List
 from .registry import LocalRegistry
+from .errors import HubError
 
 class HubClient:
     """
-    Unified client: local filesystem (default) or remote HTTP (TODO).
+    Unified client: local filesystem (default) or remote HTTP (future).
     """
     def __init__(self, root: str, remote_url: Optional[str]=None, token: Optional[str]=None):
         self.local = LocalRegistry(root)
         self.remote_url = remote_url
         self.token = token
 
-    # Local stubs
+    # Local
     def push_local(self, name: str, version: str, bundle_path: str) -> str:
         return self.local.add(name, version, bundle_path)
 
@@ -21,9 +22,9 @@ class HubClient:
     def list_local(self) -> List[str]:
         return self.local.list()
 
-    # Remote stubs
+    # Remote (not implemented in v0.1)
     def push_remote(self, name: str, version: str, bundle_path: str) -> str:
-        raise NotImplementedError("Remote hub not yet implemented")
+        raise HubError("hub.remote_unsupported: remote hub not implemented")
 
     def pull_remote(self, name: str, version: Optional[str]=None) -> Optional[str]:
-        raise NotImplementedError("Remote hub not yet implemented")
+        raise HubError("hub.remote_unsupported: remote hub not implemented")

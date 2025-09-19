@@ -1,496 +1,307 @@
-"""
-EventFlow SAL API v0.1
-
-Provides high-level functions to convert heterogeneous sensor inputs into
-standardized Event Tensor JSONL streams with deterministic ordering.
-
-Supported sources (v0.1):
-- vision.dvs file sources:
-    - format=jsonl (pass-through to normalized JSONL with ordering checks)
-    - format=aedat3|aedat4 (placeholder requiring external decoder; see notes)
-- audio.mic file sources:
-    - WAV file path with streaming STFT to band events (JSONL)
-
-Public API:
-- stream_to_jsonl(uri: str, out_path: str, **kwargs) -> None
-- parse_uri(uri: str) -> (scheme: str, params: dict)
-
-Notes:
-- AEDAT decoding is not implemented in-core. For full AEDAT support, integrate a decoder
-  (e.g., vendor SDK) and plumb decoded events into Event Tensor records before normalization.
-"""
-
 from __future__ import annotations
+"""
+EventFlow SAL high-level API
+
+Provides stream_to_jsonl(uri, out, **options) used by the ef CLI.
+
+Features:
+- Supports URIs:
+    - vision.dvs:///path/to/file.aedat4
+    - audio.mic:///path/to/file.wav
+    - imu.6dof:///path/to/file.csv
+  Compatibility shim:
+    - vision.dvs://file?format=jsonl&path=/path/to/events.jsonl (pass-through normalization)
+- Deterministic JSONL emission with a header then event records
+- Basic telemetry: counts, time span, dt stats, eps, simple drift estimate, jitter
+"""
 
 import json
-import math
 import os
-import urllib.parse
-from dataclasses import dataclass
+import time
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
-# Optional numpy acceleration for STFT
-try:
-    import numpy as np  # type: ignore
-except Exception:  # pragma: no cover
-    np = None  # type: ignore
+from eventflow_sal.open import open as open_source
+from eventflow_sal.api.uri import parse_sensor_uri, SensorURI
+from eventflow_sal.api.packet import EventPacket
 
 
-@dataclass
-class SALConfig:
-    rate_limit_keps: Optional[int] = None
-    overflow_policy: str = "drop_tail"  # "drop_head" | "drop_tail" | "block"
-    # Audio defaults
-    sample_rate: int = 16000
-    window_ms: int = 20
-    hop_ms: int = 10
-    bands: int = 32
-    dtype: str = "f16"  # f32 | f16 | i16 | u8 (for audio magnitude)
-    units_value: str = "dB"  # "dB" or "power"
+def _ensure_dir(path: str) -> None:
+    d = os.path.dirname(os.path.abspath(path))
+    if d:
+        os.makedirs(d, exist_ok=True)
 
 
-def parse_uri(uri: str) -> Tuple[str, Dict[str, str]]:
+def _percentile(sorted_vals: List[int], q: float) -> int:
+    if not sorted_vals:
+        return 0
+    if q <= 0:
+        return int(sorted_vals[0])
+    if q >= 1:
+        return int(sorted_vals[-1])
+    idx = int(round((len(sorted_vals) - 1) * q))
+    return int(sorted_vals[idx])
+
+
+def _write_header(fh, dims: List[str], units_value: str, metadata: Dict[str, Any]) -> None:
+    header = {
+        "schema_version": "0.1.0",
+        "dims": dims,
+        "units": {"time": "us", "value": units_value},
+        "dtype": "f32",
+        "layout": "coo",
+        "metadata": metadata,
+    }
+    fh.write(json.dumps({"header": header}) + "\n")
+
+
+def _write_event(fh, ts_ns: int, idx: List[int], val: float) -> None:
+    # Header declares time in microseconds; keep event records in native ns and let downstream convert?
+    # For SAL JSONL we emit native 'ts' in microseconds to match common datasets.
+    ts_us = int(round(ts_ns / 1000.0))
+    fh.write(json.dumps({"ts": ts_us, "idx": idx, "val": float(val)}) + "\n")
+
+
+def _dims_for_scheme(scheme: str) -> Tuple[List[str], str]:
+    if scheme == "vision.dvs://":
+        return (["x", "y", "polarity"], "dimensionless")
+    if scheme == "audio.mic://":
+        return (["band"], "dB")
+    if scheme == "imu.6dof://":
+        return (["axis"], "mixed")  # accel: m/s^2, gyro: rad/s
+    # Fallback
+    return (["ch"], "dimensionless")
+
+
+def _idx_for_packet(scheme: str, pkt: EventPacket) -> List[int]:
+    if scheme == "vision.dvs://":
+        x = int(pkt.meta.get("x", 0))
+        y = int(pkt.meta.get("y", 0))
+        pol = int(pkt.meta.get("polarity", 0))
+        return [x, y, pol]
+    # audio and imu are channel/axis indexed by packet.channel
+    return [int(pkt.channel)]
+
+
+def _normalize_existing_jsonl(in_path: str, out_path: str) -> Dict[str, Any]:
     """
-    Parse a SAL URI into a scheme and parameter map.
-    Example:
-      vision.dvs://file?format=jsonl&path=/data/events.jsonl
-      audio.mic://file?path=/data/audio.wav&window_ms=20&hop_ms=10
+    Pass-through normalization for an existing JSONL Event Tensor file.
+    This preserves ordering and updates/ensures a header is present.
     """
-    parsed = urllib.parse.urlparse(uri)
-    scheme = parsed.scheme  # e.g., "vision.dvs" or "audio.mic"
-    q = urllib.parse.parse_qs(parsed.query, keep_blank_values=True)
-    # Flatten single valued
-    params: Dict[str, str] = {}
-    for k, v in q.items():
-        params[k] = v[0] if v else ""
-    # 'path' may appear in query; host part can also be used for some cases
-    if "path" not in params and parsed.netloc and parsed.netloc != "file":
-        params["path"] = parsed.netloc + (parsed.path or "")
-    elif "path" not in params:
-        params["path"] = parsed.path
-    return scheme, params
-
-
-def _write_jsonl_header(fh, header: Dict[str, Any]) -> None:
-    fh.write(json.dumps({"header": header}, separators=(",", ":")) + "\n")
-
-
-def _write_jsonl_record(fh, ts: int, idx: List[int], val: float, meta: Optional[Dict[str, Any]] = None) -> None:
-    rec = {"ts": ts, "idx": idx, "val": float(val)}
-    if meta:
-        rec["meta"] = meta
-    fh.write(json.dumps(rec, separators=(",", ":")) + "\n")
-
-
-def _ensure_monotonic(sorted_ts: List[int]) -> None:
-    for i in range(1, len(sorted_ts)):
-        if sorted_ts[i] < sorted_ts[i - 1]:
-            raise ValueError(f"non-monotonic ts at index {i}: {sorted_ts[i]} < {sorted_ts[i-1]}")
-
-
-def stream_to_jsonl(uri: str, out_path: str, **kwargs) -> Dict[str, Any]:
-    """
-    Convert a SAL source URI into an Event Tensor JSONL stream at out_path.
-
-    Deterministic ordering:
-      - Records are sorted by ts (ascending), ties by idx lexicographically.
-
-    Args:
-      uri: SAL URI
-      out_path: destination JSONL file path
-      kwargs: optional overrides (e.g., rate_limit_keps, overflow_policy, sample_rate, etc.)
-              telemetry_out (str): optional path to write telemetry JSON
-
-    Returns:
-      telemetry dict containing counters and sync status
-    """
-    scheme, params = parse_uri(uri)
-    cfg = SALConfig(
-        rate_limit_keps=int(kwargs.get("rate_limit_keps", params.get("rate_limit_keps", 0))) or None,
-        overflow_policy=str(kwargs.get("overflow_policy", params.get("overflow_policy", "drop_tail"))),
-        sample_rate=int(kwargs.get("sample_rate", params.get("sample_rate", 16000))),
-        window_ms=int(kwargs.get("window_ms", params.get("window_ms", 20))),
-        hop_ms=int(kwargs.get("hop_ms", params.get("hop_ms", 10))),
-        bands=int(kwargs.get("bands", params.get("bands", 32))),
-        dtype=str(kwargs.get("dtype", params.get("dtype", "f16"))),
-        units_value=str(kwargs.get("units_value", params.get("units_value", "dB"))),
-    )
-    telemetry_out = kwargs.get("telemetry_out", params.get("telemetry_out"))
-
-    if scheme == "vision.dvs":
-        tele = _stream_dvs_to_jsonl(params, out_path, cfg)
-    elif scheme == "audio.mic":
-        tele = _stream_audio_to_jsonl(params, out_path, cfg)
-    elif scheme == "imu.6dof":
-        tele = _stream_imu_to_jsonl(params, out_path, cfg)
-    else:
-        raise ValueError(f"SAL: unsupported source scheme '{scheme}'")
-
-    # Optionally write telemetry JSON sidecar
-    if telemetry_out:
-        try:
-            with open(str(telemetry_out), "w", encoding="utf-8") as fh:
-                json.dump(tele, fh, indent=2)
-        except Exception:
-            # Non-fatal for v0.1
-            pass
+    tele: Dict[str, Any] = {}
+    _ensure_dir(out_path)
+    host_t0 = time.monotonic_ns()
+    with open(in_path, "r", encoding="utf-8") as fin, open(out_path, "w", encoding="utf-8") as fout:
+        first = fin.readline()
+        count = 0
+        ts_min = None
+        ts_max = None
+        dt_prev = None
+        dt_list: List[int] = []
+        if first:
+            try:
+                obj = json.loads(first)
+                if "header" in obj:
+                    # Write header as-is
+                    fout.write(first if first.endswith("\n") else first + "\n")
+                else:
+                    # Synthesize a minimal header if first line wasn't header
+                    _write_header(fout, ["ch"], "dimensionless", {"source": "jsonl"})
+                    # Process the first line as an event
+                    ts_us = int(obj["ts"])
+                    idx = list(obj.get("idx", []))
+                    val = float(obj.get("val", 0.0))
+                    _write_event(fout, ts_us * 1000, idx, val)
+                    count += 1
+                    ts_min = ts_us
+                    ts_max = ts_us
+                    dt_prev = ts_us
+            except Exception:
+                # Not JSON header, synthesize one and treat line as event
+                _write_header(fout, ["ch"], "dimensionless", {"source": "jsonl"})
+                try:
+                    obj = json.loads(first)
+                    ts_us = int(obj["ts"])
+                    idx = list(obj.get("idx", []))
+                    val = float(obj.get("val", 0.0))
+                    _write_event(fout, ts_us * 1000, idx, val)
+                    count += 1
+                    ts_min = ts_us
+                    ts_max = ts_us
+                    dt_prev = ts_us
+                except Exception:
+                    pass
+        for line in fin:
+            line = line.strip()
+            if not line:
+                continue
+            rec = json.loads(line)
+            ts_us = int(rec["ts"])
+            idx = list(rec.get("idx", []))
+            val = float(rec.get("val", 0.0))
+            _write_event(fout, ts_us * 1000, idx, val)
+            count += 1
+            if ts_min is None or ts_us < ts_min:
+                ts_min = ts_us
+            if ts_max is None or ts_us > ts_max:
+                ts_max = ts_us
+            if dt_prev is not None:
+                dt_list.append(ts_us - dt_prev)
+            dt_prev = ts_us
+        # Telemetry
+        dt_list_sorted = sorted(dt_list)
+        duration_us = 0 if (ts_min is None or ts_max is None) else (ts_max - ts_min)
+        eps = (count / (duration_us / 1_000_000.0)) if duration_us > 0 else 0.0
+        # Clock summary (host vs sensor span); best-effort for file passthrough
+        host_duration_ns = max(1, time.monotonic_ns() - host_t0)
+        sensor_duration_ns = int(duration_us * 1000)
+        drift_ppm_est = ((sensor_duration_ns - host_duration_ns) / float(host_duration_ns)) * 1e6 if host_duration_ns > 0 else 0.0
+        # Jitter summary derived from dt distribution
+        median_dt_us = dt_list_sorted[len(dt_list_sorted)//2] if dt_list_sorted else 0
+        jitter_us = sorted(abs(dt - median_dt_us) for dt in dt_list_sorted)
+        jitter_p50_us = jitter_us[len(jitter_us)//2] if jitter_us else 0
+        jitter_p95_us = jitter_us[int(len(jitter_us)*0.95)] if jitter_us else 0
+        jitter_p99_us = jitter_us[int(len(jitter_us)*0.99)] if jitter_us else 0
+        tele = {
+            "path_in": in_path,
+            "path_out": out_path,
+            "count": count,
+            "ts_min_us": ts_min,
+            "ts_max_us": ts_max,
+            "duration_us": duration_us,
+            "events_per_second": eps,
+            "dt": {
+                "count": len(dt_list_sorted),
+                "p50_us": _percentile(dt_list_sorted, 0.50),
+                "p95_us": _percentile(dt_list_sorted, 0.95),
+                "p99_us": _percentile(dt_list_sorted, 0.99),
+                "median_us": median_dt_us,
+            },
+            "clock": {
+                "host_duration_ns": host_duration_ns,
+                "sensor_duration_ns": sensor_duration_ns,
+                "drift_ppm_est": drift_ppm_est,
+                "jitter_p50_us": jitter_p50_us,
+                "jitter_p95_us": jitter_p95_us,
+                "jitter_p99_us": jitter_p99_us,
+            },
+            "normalized": True,
+        }
     return tele
 
 
-def _stream_dvs_to_jsonl(params: Dict[str, str], out_path: str, cfg: SALConfig) -> Dict[str, Any]:
-    fmt = params.get("format", "jsonl").lower()
-    path = params.get("path")
-    if not path:
-        raise ValueError("vision.dvs: missing 'path' parameter")
-
-    if fmt == "jsonl":
-        # Normalize an existing JSONL to ensure header and ordering
-        produced = 0
-        dropped_head = 0
-        dropped_tail = 0
-        anomalies_detected = 0
-        with open(path, "r", encoding="utf-8") as fin, open(out_path, "w", encoding="utf-8") as fout:
-            # Read header
-            header_line = fin.readline()
-            if not header_line:
-                raise ValueError("vision.dvs jsonl: empty input")
-            header_obj = json.loads(header_line)
-            if "header" not in header_obj:
-                raise ValueError("vision.dvs jsonl: first line must contain header")
-            header = header_obj["header"]
-            # Normalize header fields
-            header["schema_version"] = "0.1.0"
-            header["dims"] = ["x", "y", "polarity"]
-            header["units"] = {"time": header.get("units", {}).get("time", "us"), "value": "dimensionless"}
-            header["dtype"] = "u8"
-            header["layout"] = "coo"
-            meta = header.get("metadata", {})
-            meta.setdefault("sensor", "dvs")
-            header["metadata"] = meta
-            _write_jsonl_header(fout, header)
-
-            # Collect, sort, and write records
-            records: List[Tuple[int, List[int], float]] = []
-            for line in fin:
-                line = line.strip()
-                if not line:
-                    continue
-                rec = json.loads(line)
-                ts = int(rec["ts"])
-                idx = [int(i) for i in rec["idx"]]
-                val = float(rec.get("val", 1))
-                records.append((ts, idx, val))
-            # Sort deterministically: ts, then idx tuple
-            records.sort(key=lambda r: (r[0], tuple(r[1])))
-            _ensure_monotonic([r[0] for r in records])
-
-            # Simple spoofing/anomaly heuristic: excessive simultaneous activations at identical ts
-            # Count max same-timestamp events; if exceeds threshold ratio, flag
-            if records:
-                from collections import Counter
-                ts_counter = Counter(ts for ts, _, _ in records)
-                total = len(records)
-                max_same_ts = max(ts_counter.values())
-                if total > 0 and (max_same_ts / total) > 0.5:
-                    anomalies_detected += 1  # crude flash/spoof indicator
-
-            # Rate limiting (optional)
-            if cfg.rate_limit_keps:
-                # Cap per second per channel (idx[0]).
-                cap_per_sec = cfg.rate_limit_keps * 1000  # keps -> events per second (approx)
-                from collections import defaultdict, deque
-                per_sec_ch_counts: Dict[int, Dict[int, int]] = defaultdict(dict)
-                # For drop_head, we keep a deque and drop oldest; for drop_tail, we skip newest
-                kept_by_bucket: Dict[Tuple[int, int], deque] = {}
-                filtered: List[Tuple[int, List[int], float]] = []
-                for ts, idx, val in records:
-                    sec = ts // 1_000_000
-                    ch = idx[0] if idx else 0
-                    key = (sec, ch)
-                    cnt = per_sec_ch_counts[sec].get(ch, 0)
-                    if cnt < cap_per_sec:
-                        filtered.append((ts, idx, val))
-                        per_sec_ch_counts[sec][ch] = cnt + 1
-                        if cfg.overflow_policy == "drop_head":
-                            dq = kept_by_bucket.setdefault(key, deque())
-                            dq.append((ts, idx, val))
-                            # No drop now; drop happens when we overflow
-                    else:
-                        if cfg.overflow_policy == "drop_tail":
-                            dropped_tail += 1  # skip newest
-                        elif cfg.overflow_policy == "drop_head":
-                            # Drop the earliest kept in this bucket and keep this one
-                            dq = kept_by_bucket.setdefault(key, deque())
-                            if dq:
-                                dq.popleft()
-                                dropped_head += 1
-                                # Replace one in filtered: remove first matching bucket event
-                                # Build filtered anew for this simplistic replacement:
-                                removed = False
-                                new_filtered: List[Tuple[int, List[int], float]] = []
-                                for rts, ridx, rval in filtered:
-                                    if not removed and (rts // 1_000_000 == sec) and ((ridx[0] if ridx else 0) == ch):
-                                        removed = True
-                                        continue
-                                    new_filtered.append((rts, ridx, rval))
-                                filtered = new_filtered
-                                # Now append current
-                                filtered.append((ts, idx, val))
-                            else:
-                                # Nothing to drop; act like drop_tail
-                                dropped_tail += 1
-                        else:
-                            # block policy: since offline, we simulate by dropping tail and incrementing dropped_tail
-                            dropped_tail += 1
-                records = filtered
-
-            for ts, idx, val in records:
-                _write_jsonl_record(fout, ts, idx, val)
-            produced = len(records)
-
-        # Sync status stub for file-based sources
-        last_ts = records[-1][0] if records else 0
-        telemetry = {
-            "source": "vision.dvs",
-            "out": out_path,
-            "counters": {
-                "produced": produced,
-                "dropped_head": dropped_head,
-                "dropped_tail": dropped_tail,
-                "blocked_time_ms": 0,
-                "reordered": 0,
-                "anomalies_detected": anomalies_detected,
-            },
-            "sync": {"drift_ppm": 0.0, "jitter_ns": 0, "last_sync_ts": last_ts},
-        }
-        return telemetry
-
-    if fmt in ("aedat3", "aedat4"):
-        # Placeholder: requires external decoder integration
-        raise NotImplementedError(
-            "vision.dvs AEDAT decoding is not implemented in-core. "
-            "Integrate a decoder and map events to Event Tensor records."
-        )
-
-    raise ValueError(f"vision.dvs: unsupported format '{fmt}' (expected jsonl|aedat3|aedat4)")
-
-
-def _read_wav_mono(path: str, expected_rate: int) -> Tuple[List[float], int]:
+def stream_to_jsonl(
+    uri: str,
+    out: str,
+    *,
+    sample_rate: Optional[int] = None,   # reserved
+    window_ms: Optional[int] = None,     # reserved
+    hop_ms: Optional[int] = None,        # used for audio WAV (hop size)
+    bands: Optional[int] = None,         # used for audio (band count)
+    rate_limit_keps: Optional[int] = None,   # reserved
+    overflow_policy: Optional[str] = None,   # reserved
+    telemetry_out: Optional[str] = None,
+) -> Dict[str, Any]:
     """
-    Return mono samples (float32 in [-1, 1]) and sample_rate.
-    Uses Python's wave module; no external deps required. If the file is stereo,
-    downmix to mono.
+    Normalize a SAL source to Event Tensor JSONL.
+    Returns a telemetry dictionary; writes telemetry JSON when telemetry_out is provided.
     """
-    import wave
-    import struct
+    # Compatibility shim for jsonl pass-through: vision.dvs://file?format=jsonl&path=...
+    u = parse_sensor_uri(uri)
+    params = dict(u.params) if hasattr(u, "params") else {}
+    if u.scheme == "vision.dvs://" and params.get("format") == "jsonl" and "path" in params:
+        tele = _normalize_existing_jsonl(params["path"], out)
+        if telemetry_out:
+            _ensure_dir(telemetry_out)
+            with open(telemetry_out, "w", encoding="utf-8") as tf:
+                json.dump(tele, tf, indent=2)
+        return tele
 
-    with wave.open(path, "rb") as wf:
-        n_channels = wf.getnchannels()
-        sample_width = wf.getsampwidth()
-        sample_rate = wf.getframerate()
-        n_frames = wf.getnframes()
-        raw = wf.readframes(n_frames)
+    # Map public kwargs to driver constructor names
+    overrides: Dict[str, Any] = {}
+    if bands is not None:
+        overrides["b"] = int(bands)
+    if hop_ms is not None:
+        overrides["hop"] = int(hop_ms) * 1_000_000  # ns
 
-    # Unpack PCM
-    if sample_width == 2:  # 16-bit
-        fmt = "<" + "h" * (len(raw) // 2)
-        ints = struct.unpack(fmt, raw)
-        # Normalize to [-1, 1]
-        samples = [x / 32768.0 for x in ints]
-    elif sample_width == 1:  # 8-bit unsigned
-        fmt = "<" + "B" * len(raw)
-        ints = struct.unpack(fmt, raw)
-        samples = [(x - 128) / 128.0 for x in ints]
-    else:
-        raise ValueError(f"Unsupported WAV sample width: {sample_width} bytes")
+    # Open source via registry
+    src = open_source(uri, **overrides)
 
-    # Downmix if stereo
-    if n_channels == 2:
-        left = samples[0::2]
-        right = samples[1::2]
-        samples = [(l + r) / 2.0 for l, r in zip(left, right)]
-    elif n_channels != 1:
-        raise ValueError(f"Unsupported channel count: {n_channels}")
+    # Determine dims/units for header
+    dims, units_value = _dims_for_scheme(u.scheme)
 
-    if expected_rate and sample_rate != expected_rate:
-        # Basic resample via nearest-neighbor (placeholder); for determinism in v0.1
-        factor = sample_rate / expected_rate
-        out_len = int(len(samples) / factor)
-        resampled = [samples[int(i * factor)] for i in range(out_len)]
-        sample_rate = expected_rate
-        samples = resampled
+    # Telemetry accumulators
+    host_t0 = time.monotonic_ns()
+    host_t_last = host_t0
+    count = 0
+    ts_min_ns: Optional[int] = None
+    ts_max_ns: Optional[int] = None
+    dt_list_ns: List[int] = []
+    prev_ts_ns: Optional[int] = None
 
-    return samples, sample_rate
+    _ensure_dir(out)
+    with open(out, "w", encoding="utf-8") as fh:
+        _write_header(fh, dims, units_value, metadata=src.metadata())
+        for pkt in src.subscribe():
+            ts_ns = int(pkt.t_ns)
+            idx = _idx_for_packet(u.scheme, pkt)
+            val = float(pkt.value)
+            _write_event(fh, ts_ns, idx, val)
+            # Telemetry
+            count += 1
+            if ts_min_ns is None or ts_ns < ts_min_ns:
+                ts_min_ns = ts_ns
+            if ts_max_ns is None or ts_ns > ts_max_ns:
+                ts_max_ns = ts_ns
+            # Inter-arrival time (ns) in sensor time domain
+            if prev_ts_ns is not None:
+                dt_list_ns.append(ts_ns - prev_ts_ns)
+            prev_ts_ns = ts_ns
 
-
-def _stft_frames(samples: List[float], sample_rate: int, window_ms: int, hop_ms: int) -> Iterable[List[complex]]:
-    """
-    Deterministic STFT implementation.
-    Uses numpy FFT if available, else a pure-Python DFT (slower but deterministic).
-    """
-    win_size = int(sample_rate * window_ms / 1000)
-    hop = int(sample_rate * hop_ms / 1000)
-    if win_size <= 0 or hop <= 0:
-        raise ValueError("window_ms and hop_ms must be positive")
-    # Hann window
-    if np is not None:
-        window = 0.5 - 0.5 * np.cos(2.0 * np.pi * np.arange(win_size) / win_size)
-        x = np.array(samples, dtype=float)
-        for start in range(0, len(samples) - win_size + 1, hop):
-            frame = x[start : start + win_size] * window
-            spec = np.fft.rfft(frame)
-            yield list(spec)
-    else:
-        window = [0.5 - 0.5 * math.cos(2.0 * math.pi * n / win_size) for n in range(win_size)]
-        for start in range(0, len(samples) - win_size + 1, hop):
-            frame = [samples[start + n] * window[n] for n in range(win_size)]
-            # rfft: compute bins 0..win_size//2
-            bins = []
-            N = win_size
-            for k in range(N // 2 + 1):
-                re = 0.0
-                im = 0.0
-                for n in range(N):
-                    angle = 2.0 * math.pi * k * n / N
-                    re += frame[n] * math.cos(angle)
-                    im -= frame[n] * math.sin(angle)
-                bins.append(complex(re, im))
-            yield bins
-
-
-def _stream_audio_to_jsonl(params: Dict[str, str], out_path: str, cfg: SALConfig) -> Dict[str, Any]:
-    path = params.get("path")
-    if not path:
-        raise ValueError("audio.mic: missing 'path' parameter (WAV file)")
-
-    samples, sample_rate = _read_wav_mono(path, cfg.sample_rate)
-
-    # Header
-    header = {
-        "schema_version": "0.1.0",
-        "dims": ["band"],
-        "units": {"time": "ms", "value": cfg.units_value},
-        "dtype": cfg.dtype,
-        "layout": "coo",
-        "metadata": {"sample_rate": sample_rate, "window_ms": cfg.window_ms, "hop_ms": cfg.hop_ms},
-    }
-
-    # STFT and band aggregation
-    frames = list(_stft_frames(samples, sample_rate, cfg.window_ms, cfg.hop_ms))
-    # Power magnitude per bin
-    if np is not None:
-        mags = [np.abs(np.array(frame)) for frame in frames]
-    else:
-        mags = [[abs(x) for x in frame] for frame in frames]
-
-    # Map bins to bands (uniform grouping)
-    n_bins = len(mags[0]) if mags else 0
-    bands = max(1, cfg.bands)
-    bins_per_band = max(1, n_bins // bands) if n_bins else 1
-
-    # Write JSONL
-    produced = 0
-    anomalies_detected = 0
-    with open(out_path, "w", encoding="utf-8") as fout:
-        _write_jsonl_header(fout, header)
-        ts = 0  # ms
-        for spectrum in mags:
-            # Aggregate into bands
-            values: List[float] = []
-            for b in range(bands):
-                start = b * bins_per_band
-                end = min(len(spectrum), (b + 1) * bins_per_band)
-                if start >= end:
-                    agg = 0.0
-                else:
-                    avg = sum(float(spectrum[i]) for i in range(start, end)) / float(end - start)
-                    if cfg.units_value.lower() == "db":
-                        # Convert to dB with small epsilon to avoid log(0)
-                        eps = 1e-12
-                        agg = 20.0 * math.log10(max(avg, eps))
-                    else:
-                        agg = avg
-                values.append(agg)
-
-            # Simple narrowband spike detector: values exceeding median + 6 dB
-            if values:
-                sorted_vals = sorted(values)
-                median = sorted_vals[len(sorted_vals) // 2]
-                if any(v > (median + 6.0) for v in values):
-                    anomalies_detected += 1
-
-            # Emit events per band
-            for band_idx, v in enumerate(values):
-                _write_jsonl_record(fout, ts, [band_idx], v)
-                produced += 1
-            ts += cfg.hop_ms  # ms progression (windowed stream)
+    duration_ns = 0 if (ts_min_ns is None or ts_max_ns is None) else (ts_max_ns - ts_min_ns)
+    duration_us = int(round(duration_ns / 1000.0))
+    host_duration_ns = max(1, time.monotonic_ns() - host_t0)
+    # Estimate drift as (sensor_span - host_span)/host_span in ppm (best-effort)
+    drift_ppm_est = ((duration_ns - host_duration_ns) / float(host_duration_ns)) * 1e6 if host_duration_ns > 0 else 0.0
+    dts_us_sorted = sorted(int(round(x / 1000.0)) for x in dt_list_ns if x > 0)
+    eps = (count / (duration_us / 1_000_000.0)) if duration_us > 0 else 0.0
+    median_dt_us = dts_us_sorted[len(dts_us_sorted)//2] if dts_us_sorted else 0
+    jitter_us = sorted(abs(dt - median_dt_us) for dt in dts_us_sorted)
+    jitter_p50_us = jitter_us[len(jitter_us)//2] if jitter_us else 0
+    jitter_p95_us = jitter_us[int(len(jitter_us)*0.95)] if jitter_us else 0
+    jitter_p99_us = jitter_us[int(len(jitter_us)*0.99)] if jitter_us else 0
 
     telemetry = {
-        "source": "audio.mic",
-        "out": out_path,
-        "counters": {
-            "produced": produced,
-            "dropped_head": 0,
-            "dropped_tail": 0,
-            "blocked_time_ms": 0,
-            "reordered": 0,
-            "anomalies_detected": anomalies_detected,
+        "uri": uri,
+        "out": out,
+        "count": count,
+        "ts_min_us": None if ts_min_ns is None else int(round(ts_min_ns / 1000.0)),
+        "ts_max_us": None if ts_max_ns is None else int(round(ts_max_ns / 1000.0)),
+        "duration_us": duration_us,
+        "events_per_second": eps,
+        "dt": {
+            "count": len(dts_us_sorted),
+            "p50_us": _percentile(dts_us_sorted, 0.50),
+            "p95_us": _percentile(dts_us_sorted, 0.95),
+            "p99_us": _percentile(dts_us_sorted, 0.99),
+            "median_us": median_dt_us,
         },
-        "sync": {"drift_ppm": 0.0, "jitter_ns": 0, "last_sync_ts": ts},
+        "clock": {
+            "host_duration_ns": host_duration_ns,
+            "sensor_duration_ns": duration_ns,
+            "drift_ppm_est": drift_ppm_est,
+            "jitter_p50_us": jitter_p50_us,
+            "jitter_p95_us": jitter_p95_us,
+            "jitter_p99_us": jitter_p99_us,
+        },
+        "normalized": True,
     }
+
+    if telemetry_out:
+        _ensure_dir(telemetry_out)
+        with open(telemetry_out, "w", encoding="utf-8") as tf:
+            json.dump(telemetry, tf, indent=2)
+
     return telemetry
 
-def _stream_imu_to_jsonl(params: Dict[str, str], out_path: str, cfg: SALConfig) -> Dict[str, Any]:
-    """
-    Normalize a 6-DoF IMU CSV into Event Tensor JSONL.
-    CSV header expected: t_ns, ax, ay, az, gx, gy, gz
-    Emits one record per axis per timestamp with idx=[axis] where axis 0..5 corresponds to ax..gz.
-    """
-    path = params.get("path")
-    if not path:
-        raise ValueError("imu.6dof: missing 'path' parameter (CSV file)")
 
-    import csv
-
-    produced = 0
-    with open(out_path, "w", encoding="utf-8") as fout:
-        header = {
-            "schema_version": "0.1.0",
-            "dims": ["axis"],
-            "units": {"time": "ns", "value": "si"},
-            "dtype": "f32",
-            "layout": "coo",
-            "metadata": {"axes": ["ax","ay","az","gx","gy","gz"]},
-        }
-        _write_jsonl_header(fout, header)
-
-        with open(path, "r", encoding="utf-8") as fin:
-            reader = csv.DictReader(fin)
-            for row in reader:
-                t = int(row["t_ns"])
-                vals = [
-                    float(row.get("ax", 0.0)),
-                    float(row.get("ay", 0.0)),
-                    float(row.get("az", 0.0)),
-                    float(row.get("gx", 0.0)),
-                    float(row.get("gy", 0.0)),
-                    float(row.get("gz", 0.0)),
-                ]
-                for axis, v in enumerate(vals):
-                    _write_jsonl_record(fout, t, [axis], v)
-                    produced += 1
-
-    telemetry = {
-        "source": "imu.6dof",
-        "out": out_path,
-        "counters": {
-            "produced": produced,
-            "dropped_head": 0,
-            "dropped_tail": 0,
-            "blocked_time_ms": 0,
-            "reordered": 0,
-            "anomalies_detected": 0,
-        },
-        "sync": {"drift_ppm": 0.0, "jitter_ns": 0, "last_sync_ts": 0},
-    }
-    return telemetry
+__all__ = ["stream_to_jsonl"]

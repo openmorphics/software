@@ -1,7 +1,7 @@
 # EventFlow: A Universal, Deterministic Event-Driven Computing SDK
 
 [![Build](https://img.shields.io/badge/build-GitHub%20Actions-blue?logo=github)](https://github.com/your-org/eventflow/actions)
-[![License](https://img.shields.io/badge/License-BSD--3--Clause-green.svg)](../LICENSE)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue)](../LICENSE)
 
 EventFlow is a modular, Python-first framework for neuromorphic and event-driven data processing that runs identically across heterogeneous hardware backends and sensor modalities. It provides:
 
@@ -129,7 +129,7 @@ Direct links to package docs:
 ## Installation
 
 Requirements:
-- Python 3.11+
+- Python 3.9+ (3.9/3.10 recommended)
 - macOS/Linux (Windows via WSL recommended)
 - Optional: CUDA-capable GPU for gpu-sim backends (future)
 - Optional: Vendor SDKs (e.g., Lava/Loihi) for specific hardware backends
@@ -168,19 +168,18 @@ pip install -e ./eventflow-core ./eventflow-sal ./eventflow-modules ./eventflow-
 
 ```
 mkdir -p build
-eventflow build --model path/to/model.eir --out build/
+ef build --eir path/to/model.eir --backend cpu-sim --plan-out build/plan.json
 ```
 
 Outputs:
-- build/model.eir
-- build/cap.json
-- build/card.json
-- build/trace.json
+- build/plan.json
 
 2) Run on CPU simulator
 
 ```
-eventflow run --bundle build/ --backend cpu_sim
+ef run --eir path/to/model.eir --backend cpu-sim \
+  --input examples/vision_optical_flow/traces/inputs/vision_sample.jsonl \
+  --trace-out build/trace.jsonl
 ```
 
 The CPU simulator provides deterministic synthetic inputs (until you supply real inputs via SAL or programmatically through eventflow-core).
@@ -188,7 +187,7 @@ The CPU simulator provides deterministic synthetic inputs (until you supply real
 3) Profile latency
 
 ```
-eventflow profile --bundle build/ --backend cpu_sim
+ef --json profile --path build/trace.jsonl
 ```
 
 Reports approximate runtime metrics (latency; energy placeholder).
@@ -196,7 +195,10 @@ Reports approximate runtime metrics (latency; energy placeholder).
 4) Validate against a golden trace
 
 ```
-eventflow validate --bundle build/ --golden path/to/golden_trace.json
+ef --json compare-traces \
+  --golden path/to/golden_trace.jsonl \
+  --candidate build/trace.jsonl \
+  --eps-time-us 100 --eps-numeric 1e-5
 ```
 
 Checks trace equivalence with specified tolerances (wired in eventflow-core conformance tools).
@@ -380,4 +382,4 @@ Roadmap items are tagged in issues; feel free to pick “good first issue” lab
 
 ## License
 
-BSD-3-Clause. See ../LICENSE.
+Apache-2.0. See ../LICENSE.

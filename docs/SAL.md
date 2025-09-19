@@ -95,7 +95,7 @@ Producers MUST ensure that idx length equals dims length and that ts is monotoni
 - fixed_step alignment (optional): For fixed-step execution pipelines, SAL quantizes to dt and tracks quantization error (see Determinism).
 
 3.3. Drift and jitter estimation
-- Maintain exponential moving averages for observed drift (ppm) and jitter (ns).
+- Maintain exponential moving averages for observed drift (ppm) and jitter (ns). Telemetry MUST include inter-event interval (dt) percentiles (p50, p95, p99) and clock jitter summary fields: jitter_p50_us, jitter_p95_us, jitter_p99_us.
 - Expose SAL.sync_status(): { drift_ppm, jitter_ns, last_sync_ts }.
 
 3.4. Deterministic ordering
