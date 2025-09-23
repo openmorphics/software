@@ -22,8 +22,21 @@ class Backend:
     id: str
     dcd: DeviceCapabilityDescriptor
 
-    def compile(self, g, constraints: Optional[Dict[str, Any]]=None) -> Dict[str, Any]:  # g: EIRGraph
-        raise NotImplementedError
+    def compile(self, g, constraints: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:  # g: EIRGraph
+        """
+        Optional: Compile an EIR graph to a backend-specific binary image or configuration.
+        This method is responsible for mapping the abstract graph to concrete hardware resources.
+        Returns a JSON-serializable dictionary representing the compiled artifact.
+        """
+        raise NotImplementedError("Backend must implement the 'compile' method.")
 
-    def run_graph(self, g, inputs: Optional[Dict[str, Any]]=None) -> Dict[str, Any]:
-        raise NotImplementedError
+    def run_graph(self, g, inputs: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """
+        Execute a compiled or interpreted EIR graph with the provided input event streams.
+        Args:
+            g: The EIRGraph instance.
+            inputs: A dictionary mapping input node IDs to event iterators.
+        Returns:
+            A dictionary mapping output node IDs to lists of events produced.
+        """
+        raise NotImplementedError("Backend must implement the 'run_graph' method.")

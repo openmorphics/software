@@ -5,10 +5,13 @@ This top-level module provides thin wrappers over the canonical package 'eventfl
 Prefer importing 'eventflow_sal' directly in application code.
 """
 from __future__ import annotations
+import logging
 from typing import Iterator, Optional, Any
 from eventflow_sal.open import open as _open  # type: ignore[attr-defined]
 
 __all__ = ["open", "close", "read"]
+
+_log = logging.getLogger(__name__)
 
 def open(uri: str, **kwargs):
     """
@@ -40,6 +43,5 @@ def close(source) -> None:
         close_fn = getattr(source, "close", None)
         if callable(close_fn):
             close_fn()
-    except Exception:
-        # best-effort close; ignore
-        pass
+    except Exception as e:
+        _log.warning(f"sal.close failed on source {type(source).__name__}: {e}")

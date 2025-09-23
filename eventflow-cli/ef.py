@@ -23,10 +23,14 @@ import sys
 import datetime
 import types
 import runpy
+import logging
 from typing import Any, List
 
 # Global CLI flags
 CLI_JSON = False
+
+# Logger
+_log = logging.getLogger("eventflow.cli")
 
 # ------------------------------------------------------------
 # Dynamic module loaders (avoid packaging issues during scaffold)
@@ -53,9 +57,8 @@ def _load_module_with_fallback(path: str, name: str):
                 mod = importlib.util.module_from_spec(spec)  # type: ignore
                 spec.loader.exec_module(mod)  # type: ignore
                 return mod
-            except Exception:
-                # Fall through to alternative loaders
-                pass
+            except Exception as e:
+                _log.warning(f"cli module loader (spec) failed for '{name}': {e}")
 
         # Attempt 2: SourceFileLoader explicit execution
         try:
@@ -65,9 +68,8 @@ def _load_module_with_fallback(path: str, name: str):
             mod.__file__ = path  # type: ignore[attr-defined]
             exec(code, mod.__dict__)
             return mod
-        except Exception:
-            # Fall through to runpy
-            pass
+        except Exception as e:
+            _log.warning(f"cli module loader (SourceFileLoader) failed for '{name}': {e}")
 
         # Attempt 3: runpy fallback
         ns = runpy.run_path(path)
@@ -342,8 +344,8 @@ def cmd_profile(args: argparse.Namespace) -> None:
                 if isinstance(idx, list) and len(idx) > 0:
                     try:
                         ch_counter[int(idx[0])] += 1
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        _log.warning(f"failed to parse channel index from record: {rec}, error: {e}")
 
             duration_native = 0 if (tmin is None or tmax is None) else (tmax - tmin)
             to_us = {"ns": 0.001, "us": 1.0, "ms": 1000.0}

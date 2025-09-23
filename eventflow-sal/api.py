@@ -18,11 +18,14 @@ Features:
 import json
 import os
 import time
+import logging
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from eventflow_sal.open import open as open_source
 from eventflow_sal.api.uri import parse_sensor_uri, SensorURI
 from eventflow_sal.api.packet import EventPacket
+
+_log = logging.getLogger(__name__)
 
 
 def _ensure_dir(path: str) -> None:
@@ -128,8 +131,8 @@ def _normalize_existing_jsonl(in_path: str, out_path: str) -> Dict[str, Any]:
                     ts_min = ts_us
                     ts_max = ts_us
                     dt_prev = ts_us
-                except Exception:
-                    pass
+                except Exception as e:
+                    _log.warning(f"JSONL header missing and first line failed to parse as a record: {e}")
         for line in fin:
             line = line.strip()
             if not line:

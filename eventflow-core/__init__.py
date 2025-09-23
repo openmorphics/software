@@ -60,8 +60,8 @@ def _load_module_with_fallback(path: str, name: str):
             sys.modules[name] = mod
             spec.loader.exec_module(mod)  # type: ignore
             return mod
-        except Exception:
-            pass
+        except Exception as e:
+            _log.warning(f"backend discovery failed: {e}")
     # Attempt 2: SourceFileLoader
     try:
         loader = importlib.machinery.SourceFileLoader(name, path)
@@ -70,8 +70,8 @@ def _load_module_with_fallback(path: str, name: str):
         mod.__file__ = path  # type: ignore[attr-defined]
         exec(code, mod.__dict__)
         return mod
-    except Exception:
-        pass
+    except Exception as e:
+        _log.warning(f"module loader (SourceFileLoader) failed for '{name}': {e}")
     # Attempt 3: runpy fallback
     ns = runpy.run_path(path)
     mod = types.ModuleType(name)
@@ -114,8 +114,8 @@ def _pick_backends(reg, requested: str, prefer: Optional[List[str]] = None) -> L
     discovered = []
     try:
         discovered = list(reg.list_backends())
-    except Exception:
-        pass
+    except Exception as e:
+        _log.warning(f"module loader (spec) failed for '{name}': {e}")
     base = []
     if requested and requested != "auto":
         base = [requested]

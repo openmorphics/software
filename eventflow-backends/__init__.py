@@ -5,7 +5,11 @@ This top-level module delegates to the dynamic registry implementation to avoid
 duplicate hard-coded lists and ensure a single source of truth.
 """
 from __future__ import annotations
+import logging
 from typing import List, Any
+
+_log = logging.getLogger(__name__)
+
 
 def list_backends() -> List[str]:
     try:
@@ -23,8 +27,8 @@ def get_backend(backend_id: str) -> Any:
     try:
         from .eventflow_backends import get_backend as _gb  # type: ignore
         return _gb(backend_id)
-    except Exception:
-        pass
+    except Exception as e:
+        _log.warning(f"backend registry lookup failed for '{backend_id}': {e}")
     # Fallback: construct a minimal cpu-sim backend if requested
     if backend_id in ("cpu-sim", "cpu_sim"):
         try:

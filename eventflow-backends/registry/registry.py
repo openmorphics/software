@@ -12,7 +12,10 @@ import importlib.util
 import importlib.machinery
 import runpy
 import types
+import logging
 from typing import Any, Dict, List, Optional
+
+_log = logging.getLogger(__name__)
 
 
 def _base_dir() -> str:
@@ -28,8 +31,8 @@ def _load_module_from(path: str, name: str):
                 mod = importlib.util.module_from_spec(spec)  # type: ignore
                 spec.loader.exec_module(mod)  # type: ignore
                 return mod
-            except Exception:
-                pass
+            except Exception as e:
+                _log.warning(f"registry module loader (spec) failed for '{name}': {e}")
 
         # Attempt 2: SourceFileLoader
         try:
@@ -39,8 +42,8 @@ def _load_module_from(path: str, name: str):
             mod.__file__ = path  # type: ignore[attr-defined]
             exec(code, mod.__dict__)
             return mod
-        except Exception:
-            pass
+        except Exception as e:
+            _log.warning(f"registry module loader (SourceFileLoader) failed for '{name}': {e}")
 
         # Attempt 3: runpy fallback
         ns = runpy.run_path(path)
