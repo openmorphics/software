@@ -15,6 +15,6 @@ def handle(ns):
     cand = backend.run_graph(g)
     with open(ns.golden) as f:
         golden = json.load(f)
-    ok = trace_equivalent(golden, cand, tol_time_ns=0, tol_val=1e-6)
+    ok = trace_equivalent(golden, cand, tol_t=0, tol_v=1e-6)
     print("OK" if ok else "MISMATCH")
     return 0 if ok else 2

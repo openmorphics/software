@@ -183,7 +183,7 @@ Acceptance Criteria:
   - Clock & watermark: [`ClockModel`](eventflow-sal/eventflow_sal/sync/clock.py:5), [`ClockSync`](eventflow-sal/eventflow_sal/sync/clock.py:10), [`Watermark`](eventflow-sal/eventflow_sal/sync/watermark.py:1).
   - Misc: [`RateLimiter`](eventflow-sal/eventflow_sal/util/rate.py:2), [`RingBuffer`](eventflow-sal/eventflow_sal/util/ring.py:2).
   - DCD helpers: [`DeviceCapabilityDescriptor`](eventflow-sal/eventflow_sal/api/dcd.py:6), [`validate_dcd()`](eventflow-sal/eventflow_sal/api/dcd.py:12).
-- Package structure stubs for import stability: [`api/__init__.py`](eventflow-sal/eventflow_sal/api/__init__.py), [`drivers/__init__.py`](eventflow-sal/eventflow_sal/drivers/__init__.py), [`calib/__init__.py`](eventflow-sal/eventflow_sal/calib/__init__.py), [`formats/__init__.py`](eventflow-sal/formats/__init__.py), [`sync/__init__.py`](eventflow-sal/sync/__init__.py), [`eventflow_sal/__init__.py`](eventflow-sal/eventflow_sal/__init__.py).
+- Package structure exports for import stability: [`api/__init__.py`](eventflow-sal/eventflow_sal/api/__init__.py), [`drivers/__init__.py`](eventflow-sal/eventflow_sal/drivers/__init__.py), [`calib/__init__.py`](eventflow-sal/eventflow_sal/calib/__init__.py), [`sync/__init__.py`](eventflow-sal/eventflow_sal/sync/__init__.py), [`eventflow_sal/__init__.py`](eventflow-sal/eventflow_sal/__init__.py). Note: formats/__init__.py removed.
 
 Edge Cases and Considerations:
 - Unsupported live devices raise explicitly in [`MicSource.subscribe()`](eventflow-sal/eventflow_sal/drivers/audio.py:11), [`DVSSource.subscribe()`](eventflow-sal/eventflow_sal/drivers/dvs.py:11), [`IMUSource.subscribe()`](eventflow-sal/eventflow_sal/drivers/imu.py:10).
@@ -218,7 +218,7 @@ Edge Cases and Considerations:
 - Missing DCD files raise in registry constructors (e.g., [`cpu-sim`](eventflow-backends/registry/registry.py:60)).
 - EIR validation errors fail planning early in [`plan()`](eventflow-backends/registry/registry.py:80/129).
 - Unknown backend names raise in [`get_backend()`](eventflow-backends/__init__.py:35) and [`load_backend()`](eventflow-backends/registry/registry.py:160).
-- Package stubs present for import stability: [`gpu_sim/__init__.py`](eventflow-backends/gpu_sim/__init__.py), [`eventflow_backends/cpu_sim/__init__.py`](eventflow-backends/eventflow_backends/cpu_sim/__init__.py).
+- Backend registry provides in-process simulators; top-level stub __init__.py files have been removed. See [`eventflow_backends/__init__.py`](eventflow-backends/eventflow_backends/__init__.py:15) and dynamic registry [`list_backends()`](eventflow-backends/registry/registry.py:154), [`load_backend()`](eventflow-backends/registry/registry.py:158).
 
 Module: eventflow-hub (Local packaging and registry)
 Title: Package and manage model artifacts locally (hub stubs)
