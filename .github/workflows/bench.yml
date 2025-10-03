@@ -1,0 +1,72 @@
+name: Benchmarks
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      gate:
+        description: "Enable performance gate (future; disabled by default)"
+        required: false
+        default: "false"
+
+jobs:
+  bench:
+    name: Run macro benchmarks and upload artifacts
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Upgrade pip and install build tooling
+        run: |
+          python -m pip install -U pip
+          python -m pip install maturin pytest pytest-benchmark numpy
+
+      - name: Build eventflow-core native (release)
+        working-directory: eventflow-core
+        run: |
+          python -m maturin develop -r
+
+      - name: Build eventflow-modules native (release)
+        working-directory: eventflow-modules
+        run: |
+          python -m maturin develop -r
+
+      - name: Run eventflow-core macro benchmarks
+        run: |
+          pytest -q eventflow-core/tests/test_bench_native.py -k bench --benchmark-only --benchmark-autosave
+
+      - name: Run eventflow-modules optical flow stub benchmarks
+        run: |
+          pytest -q eventflow-modules/tests/test_bench_optical_flow.py -k bench --benchmark-only --benchmark-autosave
+
+      - name: Upload core benchmark artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-core
+          # Collect both package-local and repo-root .benchmarks just in case
+          path: |
+            eventflow-core/.benchmarks/**
+            .benchmarks/**
+          if-no-files-found: ignore
+          retention-days: 30
+
+      - name: Upload modules benchmark artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-modules
+          path: |
+            eventflow-modules/.benchmarks/**
+            .benchmarks/**
+          if-no-files-found: ignore
+          retention-days: 30

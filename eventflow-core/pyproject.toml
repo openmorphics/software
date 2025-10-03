@@ -1,21 +1,31 @@
 [build-system]
-requires = ["setuptools>=68", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["maturin>=1,<2"]
+build-backend = "maturin"
 
 [project]
 name = "eventflow-core"
 version = "0.1.0"
 description = "EventFlow Core SDK: EIR, Runtime, and Conformance"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.8"
 license = { text = "BSD-3-Clause" }
-authors = [{name="EventFlow Team"}]
+authors = [{ name = "EventFlow Team" }]
 classifiers = [
   "License :: OSI Approved :: BSD License",
   "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
 ]
 
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["eventflow_core*"]
+# Maturin configuration for a mixed Python/Rust project
+[tool.maturin]
+bindings = "pyo3"
+module-name = "eventflow_core._rust._native"
+manifest-path = "rust/Cargo.toml"
+python-source = "."
+manylinux = "2_28"
+strip = true

@@ -1,1 +1,39 @@
 # EventFlow Domain Modules
+
+
+## Native vision stub and EF_NATIVE
+
+This package provides an optional Rust-backed vision stub for early acceleration experiments:
+- Loader module: eventflow_modules._rust (exposes `native` when available)
+- Native module name: eventflow_modules._rust._vision_native
+- Current kernel: optical_flow_stub(frames: np.ndarray[f32, HxW]) → np.ndarray[f32, HxW] (copy placeholder)
+
+EF_NATIVE toggle behavior follows eventflow-core:
+- EF_NATIVE=1 → force native if available; warn and fall back if import fails
+- EF_NATIVE=0 → force pure Python
+- Unset → auto; use native when available
+
+Quick check:
+- from eventflow_modules._rust import native as vis_native
+- print(getattr(vis_native, "RUST_ENABLED", False))
+
+## Installation and local build
+
+- pip install eventflow-modules  (installs eventflow-core dependency)
+- Local dev build:
+  - python -m pip install -U maturin
+  - cd eventflow-modules
+  - python -m maturin develop -r
+
+Supported wheels target Python 3.8–3.12 with abi3 across macOS universal2, manylinux_2_28/musllinux, and Windows MSVC.
+
+## Macro-benchmark example
+
+- python -m pip install -U pytest pytest-benchmark numpy
+- pytest -q eventflow-modules/tests/test_bench_optical_flow.py -k bench --benchmark-only --benchmark-autosave
+
+CI captures autosaved results from .benchmarks and uploads artifacts (see bench.yml in the repo).
+
+## Roadmap note
+
+The real optical flow kernel is in progress; optical_flow_stub is a drop-in shape/ABI placeholder to enable data plumbing and benchmarking.

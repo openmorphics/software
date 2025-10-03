@@ -1,1 +1,99 @@
 # EventFlow Core
+
+
+## Native acceleration toggle (EF_NATIVE)
+The Rust native extension for eventflow-core is optionally enabled at import time via the EF_NATIVE environment variable. Behavior:
+- EF_NATIVE=1: force enable if available; warns and falls back to Python if the native module fails to import.
+- EF_NATIVE=0: force disable; always use pure Python.
+- Unset: auto; use native when available.
+
+See loader in [eventflow_core._rust.__init__](eventflow-core/eventflow_core/_rust/__init__.py).
+
+## Exception types
+Use exceptions from eventflow_core.errors. These alias to the native exception classes when the native module is available, so user code can catch a single canonical type regardless of backend:
+- BucketError: raised by native bucket_sum_i64_f32 for invalid arguments (e.g., dt_ns &lt;= 0, length mismatch).
+- FuseError: raised by native fuse_coincidence_i64 for invalid arguments (e.g., window_ns &lt;= 0).
+
+Example:
+- from eventflow_core.errors import BucketError, FuseError
+
+## Minimal structured logging bridge
+A small synchronous logging bridge is exposed by the native module:
+- set_log_sink(sink): store a Python callable to receive logs as sink(level, message). Passing None clears it. A convenience re-export exists at eventflow_core._rust.set_log_sink when native is present.
+- log_emit(level, message): emits to the sink if set. Accessible as eventflow_core._rust.native.log_emit.
+
+Notes:
+- Compute paths do not log by default.
+- Do not expect callbacks from sections where the GIL is released; log_emit must run while holding the GIL (native PyO3 functions do).
+
+Usage snippet:
+- from eventflow_core._rust import set_log_sink
+- from eventflow_core._rust import native as core_native
+- def sink(level, message): print(level, message)
+- set_log_sink(sink)
+- core_native.log_emit("INFO", "hello from native")
+- set_log_sink(None)  # clear
+
+
+## Installation and wheels
+
+Prebuilt abi3 wheels are provided for:
+- Python 3.8–3.12
+- macOS universal2
+- manylinux_2_28 and musllinux
+- Windows (MSVC)
+
+Install from a wheel (recommended):
+- pip install eventflow-core
+
+Build locally (development):
+- python -m pip install -U maturin
+- cd eventflow-core
+- python -m maturin develop -r
+
+This installs the native extension at eventflow_core._rust._native alongside the pure-Python package.
+
+## EF_NATIVE toggle recap and examples
+
+The Rust native extension is optional and controlled by EF_NATIVE:
+
+- EF_NATIVE=1: force enable if available; warns and falls back to Python if import fails.
+- EF_NATIVE=0: force disable; always use pure Python.
+- Unset: auto; use native when available.
+
+Examples:
+- EF_NATIVE=1 python -c "import eventflow_core._rust as r; print(r.is_enabled())"
+- EF_NATIVE=0 python -c "import eventflow_core._rust as r; print(r.is_enabled())"
+
+Programmatic check:
+- from eventflow_core._rust import is_enabled, native
+- if is_enabled(): print("native active")
+
+## Exceptions and logging bridge
+
+Use canonical exceptions from eventflow_core.errors (aliased to native classes when loaded):
+- from eventflow_core.errors import BucketError, FuseError
+
+Set a synchronous logging sink (no GIL-released callbacks):
+- from eventflow_core._rust import native, set_log_sink
+- def sink(level, message): print(f"[{level}] {message}")
+- set_log_sink(sink)
+- native.log_emit("INFO", "hello from native")
+- set_log_sink(None)  # clear
+
+Notes:
+- Logging callbacks are synchronous and must run while the GIL is held.
+- Compute-heavy paths generally avoid logging.
+
+## Benchmarking quickstart
+
+Local:
+- python -m pip install -U pytest pytest-benchmark
+- pytest -q eventflow-core/tests/test_bench_native.py -k bench --benchmark-only --benchmark-autosave
+
+CI:
+- Bench workflow uploads autosaved results from .benchmarks as artifacts:
+  - bench-core (eventflow-core)
+  - bench-modules (eventflow-modules)
+
+Artifacts contain JSON/CSV that can be compared across runs. Performance is currently non-gating.

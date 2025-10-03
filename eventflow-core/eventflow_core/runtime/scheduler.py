@@ -9,6 +9,14 @@ from ..eir.ops import (
 )
 from ..eir.types import time_to_ns
 
+# Optional Rust acceleration
+try:
+    from .._rust import is_enabled as _ef_native_enabled, native as _ef_native  # type: ignore
+except Exception:
+    def _ef_native_enabled() -> bool:
+        return False
+    _ef_native = None  # type: ignore
+
 @dataclass
 class ExecNode:
     kind: str
@@ -28,24 +36,38 @@ def build_exec_nodes(g: EIRGraph) -> Dict[str, ExecNode]:
             d=time_to_ns(p["delay"]); nodes[nid]=ExecNode(k,lambda it,d=d:step_delay(it,d),None)
         elif k=="fuse":
             win = time_to_ns(p["window"]); minc = int(p["min_count"])
-            def _fuse(it_a: Iterator[Event], it_b: Iterator[Event]):
-                import heapq
-                heap = []
-                buf_a, buf_b = [], []
-                for t, c, v, meta in it_a:
-                    heapq.heappush(heap, (t, ("a", (t, c, v, meta))))
-                for t, c, v, meta in it_b:
-                    heapq.heappush(heap, (t, ("b", (t, c, v, meta))))
-                while heap:
-                    t, (src, ev) = heapq.heappop(heap)
-                    buf = buf_a if src == "a" else buf_b
-                    buf.append(ev)
-                    cutoff = t - win
-                    buf_a[:] = [e for e in buf_a if e[0] >= cutoff]
-                    buf_b[:] = [e for e in buf_b if e[0] >= cutoff]
-                    if len(buf_a) + len(buf_b) >= minc and buf_a and buf_b:
-                        yield (t, 0, 1.0, {"unit": "coincidence"})
-            nodes[nid] = ExecNode(k, _fuse, None)
+            if _ef_native_enabled() and _ef_native is not None and hasattr(_ef_native, "fuse_coincidence_i64"):
+                def _fuse_native(it_a: Iterator[Event], it_b: Iterator[Event]):
+                    import numpy as np
+                    t_a = [int(t) for (t, _, _, _) in it_a]
+                    t_b = [int(t) for (t, _, _, _) in it_b]
+                    if not t_a and not t_b:
+                        return
+                    t_a_arr = np.asarray(t_a, dtype=np.int64) if t_a else np.empty((0,), dtype=np.int64)
+                    t_b_arr = np.asarray(t_b, dtype=np.int64) if t_b else np.empty((0,), dtype=np.int64)
+                    t_out, v_out = _ef_native.fuse_coincidence_i64(t_a_arr, t_b_arr, int(win), int(minc))
+                    for t, val in zip(t_out.tolist(), v_out.tolist()):
+                        yield (int(t), 0, float(val), {"unit": "coincidence"})
+                nodes[nid] = ExecNode(k, _fuse_native, None)
+            else:
+                def _fuse(it_a: Iterator[Event], it_b: Iterator[Event]):
+                    import heapq
+                    heap = []
+                    buf_a, buf_b = [], []
+                    for t, c, v, meta in it_a:
+                        heapq.heappush(heap, (t, ("a", (t, c, v, meta))))
+                    for t, c, v, meta in it_b:
+                        heapq.heappush(heap, (t, ("b", (t, c, v, meta))))
+                    while heap:
+                        t, (src, ev) = heapq.heappop(heap)
+                        buf = buf_a if src == "a" else buf_b
+                        buf.append(ev)
+                        cutoff = t - win
+                        buf_a[:] = [e for e in buf_a if e[0] >= cutoff]
+                        buf_b[:] = [e for e in buf_b if e[0] >= cutoff]
+                        if len(buf_a) + len(buf_b) >= minc and buf_a and buf_b:
+                            yield (t, 0, 1.0, {"unit": "coincidence"})
+                nodes[nid] = ExecNode(k, _fuse, None)
         elif k=="stft":
             n_fft = int(p["n_fft"]); hop_ns = time_to_ns(p["hop"]); sr = int(p["sample_rate_hz"]); win = p.get("window","hann")
             nodes[nid] = ExecNode(k, lambda it, n_fft=n_fft, hop_ns=hop_ns, sr=sr, win=win: step_stft(it, n_fft, hop_ns, sr, win), None)

@@ -1,0 +1,216 @@
+name: Build and Test Wheels
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  # Build all wheels with abi3 cp38 via PyO3; maturin respects abi3 if configured in Cargo/pyproject
+  MATURIN_PEP517_ARGS: "--release --strip"
+
+jobs:
+  linux-manylinux:
+    name: manylinux 2_28 (${{ matrix.target }})
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [x86_64, aarch64]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build eventflow-core wheel
+        uses: PyO3/maturin-action@v1
+        with:
+          command: build
+          manylinux: "2_28"
+          target: ${{ matrix.target }}
+          args: ${{ env.MATURIN_PEP517_ARGS }} -m eventflow-core/pyproject.toml --out dist
+
+      - name: Build eventflow-modules wheel
+        uses: PyO3/maturin-action@v1
+        with:
+          command: build
+          manylinux: "2_28"
+          target: ${{ matrix.target }}
+          args: ${{ env.MATURIN_PEP517_ARGS }} -m eventflow-modules/pyproject.toml --out dist
+
+      - name: Upload artifacts (manylinux ${{ matrix.target }})
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-manylinux-${{ matrix.target }}
+          path: dist/*
+
+  linux-musllinux:
+    name: musllinux 1_2 (${{ matrix.target }})
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [x86_64, aarch64]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build eventflow-core wheel
+        uses: PyO3/maturin-action@v1
+        with:
+          command: build
+          manylinux: "musllinux_1_2"
+          target: ${{ matrix.target }}
+          args: ${{ env.MATURIN_PEP517_ARGS }} -m eventflow-core/pyproject.toml --out dist
+
+      - name: Build eventflow-modules wheel
+        uses: PyO3/maturin-action@v1
+        with:
+          command: build
+          manylinux: "musllinux_1_2"
+          target: ${{ matrix.target }}
+          args: ${{ env.MATURIN_PEP517_ARGS }} -m eventflow-modules/pyproject.toml --out dist
+
+      - name: Upload artifacts (musllinux ${{ matrix.target }})
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-musllinux-${{ matrix.target }}
+          path: dist/*
+
+  macos-universal2:
+    name: macOS universal2
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build eventflow-core universal2
+        uses: PyO3/maturin-action@v1
+        with:
+          command: build
+          args: ${{ env.MATURIN_PEP517_ARGS }} --universal2 -m eventflow-core/pyproject.toml --out dist
+
+      - name: Build eventflow-modules universal2
+        uses: PyO3/maturin-action@v1
+        with:
+          command: build
+          args: ${{ env.MATURIN_PEP517_ARGS }} --universal2 -m eventflow-modules/pyproject.toml --out dist
+
+      - name: Upload artifacts (macOS)
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-macos-universal2
+          path: dist/*
+
+  windows-msvc:
+    name: Windows MSVC x64
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build eventflow-core wheel
+        uses: PyO3/maturin-action@v1
+        with:
+          command: build
+          args: ${{ env.MATURIN_PEP517_ARGS }} -m eventflow-core/pyproject.toml --out dist
+
+      - name: Build eventflow-modules wheel
+        uses: PyO3/maturin-action@v1
+        with:
+          command: build
+          args: ${{ env.MATURIN_PEP517_ARGS }} -m eventflow-modules/pyproject.toml --out dist
+
+      - name: Upload artifacts (windows)
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-windows-msvc
+          path: dist/*
+
+  test-wheels:
+    name: Install and test wheels (Linux x86_64)
+    needs: [linux-manylinux, linux-musllinux, macos-universal2, windows-msvc]
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download built wheels
+        uses: actions/download-artifact@v4
+        with:
+          path: wheelhouse
+
+      - name: Create venv and install wheels
+        run: |
+          python3 -m venv .venv
+          . .venv/bin/activate
+          pip install -U pip
+          # Prefer manylinux wheels; fallback to local build if none found
+          WHEELS=$(find wheelhouse -type f -name "*.whl" | tr '\n' ' ' || true)
+          if [ -n "$WHEELS" ]; then
+            pip install $WHEELS
+          else
+            pip install maturin
+            maturin build -m eventflow-core/pyproject.toml -r --strip --out dist
+            maturin build -m eventflow-modules/pyproject.toml -r --strip --out dist
+            pip install dist/*.whl
+          fi
+          pip install -U pytest pytest-benchmark numpy
+
+      - name: Run test suite (core)
+        run: |
+          . .venv/bin/activate
+          pytest -q eventflow-core/tests
+
+      - name: Run test suite (modules)
+        run: |
+          . .venv/bin/activate
+          pytest -q eventflow-modules/tests
+
+  bench-artifacts:
+    name: Attach benchmark artifacts from Benchmarks workflow (PRs)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download bench-core artifact from Benchmarks
+        uses: dawidd6/action-download-artifact@v3
+        with:
+          workflow: bench.yml
+          pr: ${{ github.event.pull_request.number }}
+          name: bench-core
+          path: bench_artifacts/core
+          workflow_conclusion: success
+        continue-on-error: true
+
+      - name: Download bench-modules artifact from Benchmarks
+        uses: dawidd6/action-download-artifact@v3
+        with:
+          workflow: bench.yml
+          pr: ${{ github.event.pull_request.number }}
+          name: bench-modules
+          path: bench_artifacts/modules
+          workflow_conclusion: success
+        continue-on-error: true
+
+      - name: Upload bench-core (re-publish)
+        if: ${{ hashFiles('bench_artifacts/core/**') != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-core
+          path: bench_artifacts/core/**
+          if-no-files-found: ignore
+          retention-days: 30
+
+      - name: Upload bench-modules (re-publish)
+        if: ${{ hashFiles('bench_artifacts/modules/**') != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-modules
+          path: bench_artifacts/modules/**
+          if-no-files-found: ignore
+          retention-days: 30

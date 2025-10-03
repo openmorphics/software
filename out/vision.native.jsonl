@@ -1,0 +1,2 @@
+{"header": {"schema_version": "0.1.0", "dims": ["x", "y", "polarity"], "units": {"time": "us", "value": "dimensionless"}, "dtype": "f32", "layout": "coo", "metadata": {"backend": "native-rust", "kernel": "optical_flow_shift_delay_fuse"}}}
+{"ts": 133, "idx": [13, 45, 1], "val": 1.0}

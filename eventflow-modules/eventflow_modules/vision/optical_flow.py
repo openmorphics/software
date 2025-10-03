@@ -3,6 +3,14 @@ from typing import Optional, Dict, Any
 from eventflow_core.eir.graph import EIRGraph
 from eventflow_core.eir.ops import EventFuse, DelayLine, XYToChannel, ShiftXY
 
+# Optional Rust acceleration for vision
+try:
+    from .._rust import is_enabled as _ef_native_enabled, native as _ef_native  # type: ignore
+except Exception:
+    def _ef_native_enabled() -> bool:
+        return False
+    _ef_native = None  # type: ignore
+
 def optical_flow(
     source: Any,
     window: str = "2 ms",

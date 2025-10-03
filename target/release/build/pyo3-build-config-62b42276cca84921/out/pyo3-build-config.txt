@@ -1,0 +1,11 @@
+implementation=CPython
+version=3.8
+shared=true
+abi3=true
+lib_name=python3.9
+lib_dir=/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib
+executable=/Users/mini/software copy/.venv/bin/python
+pointer_width=64
+build_flags=
+python_framework_prefix=/Applications/Xcode.app/Contents/Developer/Library/Frameworks
+suppress_build_script_link_lines=false
