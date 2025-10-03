@@ -12,6 +12,10 @@ from .always_on import (
     FrontendConfig,
     VADConfig,
     KWSConfig,
+    # SAL/bands variants
+    build_always_on_bands_graph,
+    run_wav_bands_sal,
+    run_mic_bands_sal,
 )
 
 __all__ = [
@@ -28,4 +32,8 @@ __all__ = [
     "FrontendConfig",
     "VADConfig",
     "KWSConfig",
+    # SAL/bands variants
+    "build_always_on_bands_graph",
+    "run_wav_bands_sal",
+    "run_mic_bands_sal",
 ]

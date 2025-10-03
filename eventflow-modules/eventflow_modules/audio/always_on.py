@@ -708,3 +708,114 @@ def main(argv: Optional[List[str]] = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+# ----------------------------
+# Optional SAL adapters (bands input)
+# ----------------------------
+
+def build_always_on_bands_graph(params: Optional[Dict[str, Any]] = None) -> EIRGraph:
+    """
+    Build a variant of the always-on graph that expects precomputed band (mel-like) events
+    as input instead of PCM. This is intended for parity with SAL band sources.
+
+    Topology:
+      mel(out) -> vad.a
+      mel(out) -> vad.b
+      mel(out) -> kws.in
+
+    Note:
+      We use a DelayLine("mel", delay="0 ms") as a pass-through node to ensure that
+      'mel' appears in outputs for visualization, while feeding VAD/KWS branches.
+    """
+    p = params or {}
+    vad_window = p.get("vad_window", "30 ms")
+    vad_min_bands = int(p.get("vad_min_bands", 3))
+    tau_m = p.get("kws_tau_m", "10 ms")
+    v_th = float(p.get("kws_v_th", 0.3))
+    v_reset = float(p.get("kws_v_reset", 0.0))
+    r_m = float(p.get("kws_r_m", 1.0))
+    refractory = p.get("kws_refractory", "2 ms")
+
+    # Lazy import to avoid altering the global imports above
+    from eventflow_core.eir.ops import DelayLine
+
+    g = EIRGraph()
+    g.add_node("mel", DelayLine("mel", delay="0 ms").as_op())
+    g.add_node("vad", EventFuse("vad", window=vad_window, min_count=vad_min_bands).as_op())
+    g.add_node("kws", LIFNeuron("kws", tau_m=tau_m, v_th=v_th, v_reset=v_reset, r_m=r_m, refractory=refractory).as_op())
+
+    g.connect("mel", "out", "vad", "a")
+    g.connect("mel", "out", "vad", "b")
+    g.connect("mel", "out", "kws", "in")
+    return g
+
+
+def sal_wav_band_events(path: str, bands: int = 32, hop_ms: float = 10.0) -> Iterator[Event]:
+    """
+    Adapter that yields EventFlow-style events (t_ns, ch, val, meta) from SAL WAVFileSource band events.
+    Requires eventflow-sal to be installed.
+    """
+    try:
+        from eventflow_sal.eventflow_sal.drivers.audio import WAVFileSource  # type: ignore
+    except Exception:
+        # Fallback import path if package layout differs
+        try:
+            from eventflow_sal.drivers.audio import WAVFileSource  # type: ignore
+        except Exception as e:
+            raise RuntimeError("eventflow-sal is not available. Install it to use SAL WAV band source.") from e
+
+    hop_ns = int(hop_ms * 1e6)
+    src = WAVFileSource(path, b=bands, hop=hop_ns)
+    it = src.subscribe()
+    if it is None:
+        return
+        yield  # make this a generator even if None
+    for pkt in it:
+        # EventPacket has fields: t_ns, channel, value, meta
+        yield (int(pkt.t_ns), int(pkt.channel), float(pkt.value), dict(pkt.meta))
+
+
+def run_wav_bands_sal(
+    wav_path: str,
+    cfg: Optional[PipelineConfig] = None,
+    energy_models: str = "both",  # "arm" | "laptop" | "both"
+    viz: str = "plotly",          # "mpl" | "plotly" | "none"
+) -> Dict[str, Any]:
+    """
+    Run the always-on graph variant that ingests precomputed band events from SAL WAVFileSource.
+    This bypasses STFT/Mel inside EventFlow and uses SAL's bands directly.
+    """
+    cfg = cfg or PipelineConfig()
+    params = _shared_params_from_config(cfg)
+    g = build_always_on_bands_graph(params)
+
+    # Feed SAL band events into the 'mel' node (DelayLine passthrough) so they appear in outputs["mel"]
+    inputs = {"mel": sal_wav_band_events(wav_path, bands=cfg.fe.n_mels)}
+    report = run_instrumented_event_mode(g, inputs, cfg)
+    energies = compare_energy_models(report, params, which=energy_models)
+
+    visualize(report, params, energies, backend=viz)
+
+    return {
+        "mel_frames": report.mel_frames,
+        "per_node": {k: vars(v) for k, v in report.per_node.items()},
+        "energy": [{"model": e.model_name, "total_nJ": e.total_nj, "per_node_nJ": e.per_node_nj} for e in energies],
+    }
+
+
+def run_mic_bands_sal(
+    duration_s: float = 15.0,
+    cfg: Optional[PipelineConfig] = None,
+    energy_models: str = "arm",
+    viz: str = "mpl",
+) -> Dict[str, Any]:
+    """
+    Placeholder for SAL MicSource band stream. The current SAL MicSource is a stub that yields nothing.
+    Prefer `run_mic_live` (sounddevice) or provide a concrete SAL mic implementation.
+
+    Raises:
+        RuntimeError: indicating that SAL MicSource live bands are not available.
+    """
+    raise RuntimeError(
+        "SAL MicSource live band streaming is not available in the provided SAL drivers. "
+        "Use `run_mic_live` for microphone capture or provide a SAL mic implementation."
+    )

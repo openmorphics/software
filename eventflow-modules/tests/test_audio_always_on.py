@@ -99,5 +99,33 @@ class TestAlwaysOnAudio(unittest.TestCase):
         ])
         self.assertEqual(rc, 0)
 
+    def test_vad_emits_events_with_low_min_bands(self):
+        # Configure to make VAD coincidences likely (min_bands=2) on a simple tone
+        cfg = PipelineConfig(
+            fe=FrontendConfig(sample_rate_hz=16000, n_fft=64, hop="8 ms", n_mels=10),
+            vad=VADConfig(window="30 ms", min_bands=2),
+            kws=KWSConfig(tau_m="10 ms", v_th=0.3),
+        )
+        g = build_always_on_graph({
+            "sample_rate_hz": cfg.fe.sample_rate_hz,
+            "n_fft": cfg.fe.n_fft,
+            "hop": cfg.fe.hop,
+            "n_mels": cfg.fe.n_mels,
+            "fmin_hz": cfg.fe.fmin_hz,
+            "fmax_hz": cfg.fe.fmax_hz,
+            "mel_log": cfg.fe.mel_log,
+            "window": cfg.fe.window,
+            "vad_window": cfg.vad.window,
+            "vad_min_bands": cfg.vad.min_bands,
+            "kws_tau_m": cfg.kws.tau_m,
+            "kws_v_th": cfg.kws.v_th,
+            "kws_v_reset": cfg.kws.v_reset,
+            "kws_r_m": cfg.kws.r_m,
+            "kws_refractory": cfg.kws.refractory,
+        })
+        report = run_instrumented_event_mode(g, {"stft": sine_pcm(1200, 200, 16000)}, cfg)
+        self.assertIn("vad", report.outputs)
+        self.assertGreater(len(report.outputs.get("vad", [])), 0)
+
 if __name__ == "__main__":
     unittest.main()
