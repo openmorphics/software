@@ -32,3 +32,9 @@ manifest-path = "rust/Cargo.toml"
 python-source = "."
 manylinux = "2_28"
 strip = true
+
+[project.scripts]
+ef-audio-demo = "eventflow_modules.audio.always_on:main"
+
+[project.optional-dependencies]
+audio-viz = ["matplotlib", "plotly", "sounddevice"]
