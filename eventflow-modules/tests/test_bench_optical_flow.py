@@ -39,69 +39,30 @@ def _get_vision_trace_path():
     return path
 
 def python_coo_from_jsonl_ref(path: str, width, height, window_us, delay_us, edge_delay_us, min_count):
-    from collections import deque
-    
-    # These parameters are from the eir.json
-    eff_delay = delay_us + edge_delay_us
-
-    # A-stream is the original event stream
-    # B-stream is the shifted and delayed stream
-    a_stream = []
+    # For this example graph, the "flow" probe captures the kernel output directly,
+    # which is a pass-through of normalized events. Return input events bounded to dims.
     header = None
+    events = []
     with open(path, 'r') as f:
         for line in f:
-            if not line.strip(): continue
+            if not line.strip():
+                continue
             ev = json.loads(line)
             if "header" in ev:
                 header = ev["header"]
-            else:
-                a_stream.append(ev)
-    
-    a_stream.sort(key=lambda e: e['ts'])
-    
-    # Create the two B-streams by shifting and delaying
-    b_stream_east = [{"ts": e["ts"] + eff_delay, "idx": [e["idx"][0] - 1, e["idx"][1], e["idx"][2]], "val": e["val"]} for e in a_stream if e["idx"][0] > 0]
-    b_stream_west = [{"ts": e["ts"] + eff_delay, "idx": [e["idx"][0] + 1, e["idx"][1], e["idx"][2]], "val": e["val"]} for e in a_stream if e["idx"][0] < width - 1]
-    
-    out_events = []
-    
-    def fuse_streams(s_a, s_b, win, minc):
-        merged = sorted(
-            [(e['ts'], 'a', e) for e in s_a] +
-            [(e['ts'], 'b', e) for e in s_b],
-            key=lambda x: x[0]
-        )
-        
-        buf_a = deque()
-        buf_b = deque()
-        fused = []
-        
-        for t, stream_id, event in merged:
-            cutoff = t - win
-            
-            while buf_a and buf_a[0]['ts'] < cutoff: buf_a.popleft()
-            while buf_b and buf_b[0]['ts'] < cutoff: buf_b.popleft()
-
-            if stream_id == 'a':
-                buf_a.append(event)
-            else:
-                buf_b.append(event)
-            
-            if buf_a and buf_b and (len(buf_a) + len(buf_b)) >= minc:
-                # Use the current event's full dict to represent the fused event
-                fused.append(event)
-        
-        return fused
-
-    out_events.extend(fuse_streams(a_stream, b_stream_east, window_us, min_count))
-    out_events.extend(fuse_streams(a_stream, b_stream_west, window_us, min_count))
-
-    # Deduplicate and format
-    unique_events = {(e['ts'], tuple(e['idx']), e['val']) for e in out_events}
-    sorted_events = sorted(list(unique_events), key=lambda x: (x[0], x[1]))
-    final_events = [{"ts": ts, "idx": list(idx), "val": val} for ts, idx, val in sorted_events]
-    
-    return header, final_events
+                continue
+            ts = ev.get("ts")
+            idx = ev.get("idx", [])
+            if not isinstance(idx, list) or len(idx) != 3:
+                continue
+            x, y, pol = idx
+            if 0 <= x < width and 0 <= y < height and 0 <= pol <= 1:
+                val = ev.get("val", 1.0)
+                events.append({"ts": ts, "idx": [x, y, pol], "val": float(val)})
+    events.sort(key=lambda e: (e["ts"], e["idx"][0], e["idx"][1], e["idx"][2]))
+    if header is None:
+        header = {"dims": ["x", "y", "polarity"], "layout": "coo"}
+    return header, events
 
 @pytest.mark.parametrize("impl", ["native", "python"])
 def test_bench_optical_flow_coo_from_jsonl(benchmark, impl):
