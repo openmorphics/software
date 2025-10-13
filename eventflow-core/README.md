@@ -85,6 +85,23 @@ Notes:
 - Logging callbacks are synchronous and must run while the GIL is held.
 - Compute-heavy paths generally avoid logging.
 
+## Performance gates
+
+CI runs environment-gated speedup tests to ensure the native kernels remain faster than their Python references. These tests compare both implementations on the same runner and assert minimum speedup ratios using time.perf_counter with warmups, multiple reps, and median aggregation.
+
+- Enablement:
+  - Gates run only when EF_BENCH_GATE=1 and the native module is available.
+  - Thresholds are configurable via env vars.
+
+- Defaults used in CI:
+  - CORE_BUCKET_MIN=1.5
+  - CORE_FUSE_MIN=1.5
+
+- Run locally:
+  - export EF_NATIVE=1 EF_BENCH_GATE=1
+  - optional thresholds: export CORE_BUCKET_MIN=1.5 CORE_FUSE_MIN=1.5
+  - python -m pytest -q eventflow-core/tests/test_bench_gate_speedups.py
+
 ## Benchmarking quickstart
 
 Local:
@@ -97,3 +114,22 @@ CI:
   - bench-modules (eventflow-modules)
 
 Artifacts contain JSON/CSV that can be compared across runs. Performance is currently non-gating.
+
+## Releasing
+
+- Tagging conventions:
+  - vX.Y.Z → publish to PyPI
+  - vX.Y.ZrcN / vX.Y.ZaN / vX.Y.ZbN → publish to TestPyPI
+- Manual dispatch:
+  - GitHub Actions → "Release" → Run workflow with target=testpypi
+- Build targets (abi3 cp38+):
+  - macOS universal2 (arm64 + x86_64)
+  - manylinux_2_28: x86_64, aarch64
+  - musllinux_1_2: x86_64, aarch64
+  - Windows MSVC x64
+- Local dry-run (no publish):
+  - python -m pip install -U maturin
+  - cd eventflow-core && python -m maturin build -r
+- Notes:
+  - Wheels are abi3 (cp38+) and delocated via auditwheel/delocate by maturin.
+  - EF_NATIVE behavior remains unchanged; see section above.

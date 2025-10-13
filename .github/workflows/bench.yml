@@ -42,6 +42,18 @@ jobs:
         run: |
           python -m maturin develop -r
 
+      - name: Run performance gates (native vs Python)
+        env:
+          EF_NATIVE: "1"
+          EF_BENCH_GATE: "1"
+          CORE_BUCKET_MIN: "1.5"
+          CORE_FUSE_MIN: "1.5"
+          MOD_PASS_MIN: "1.3"
+          MOD_FUSE_MIN: "1.5"
+        run: |
+          pytest -q eventflow-core/tests/test_bench_gate_speedups.py
+          pytest -q eventflow-modules/tests/test_bench_gate_speedups.py
+
       - name: Run eventflow-core macro benchmarks
         run: |
           pytest -q eventflow-core/tests/test_bench_native.py -k bench --benchmark-only --benchmark-autosave

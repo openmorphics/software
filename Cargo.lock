@@ -22,6 +22,7 @@ name = "eventflow_modules_vision_native"
 version = "0.1.0"
 dependencies = [
  "numpy",
+ "once_cell",
  "pyo3",
  "serde",
  "serde_json",

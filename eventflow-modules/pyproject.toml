@@ -24,6 +24,11 @@ dependencies = [
   "eventflow-core"
 ]
 
+[project.urls]
+Homepage = "https://github.com/openmorphics/software"
+Repository = "https://github.com/openmorphics/software"
+Documentation = "https://github.com/openmorphics/software/tree/main/docs"
+
 # Maturin configuration for a mixed Python/Rust project
 [tool.maturin]
 bindings = "pyo3"

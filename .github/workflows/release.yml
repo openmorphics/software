@@ -1,0 +1,202 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Publish target'
+        required: true
+        default: testpypi
+        type: choice
+        options:
+          - testpypi
+          - pypi
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-core:
+    name: Build eventflow-core (${{ matrix.label }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux manylinux_2_28
+          - os: ubuntu-latest
+            policy: 2_28
+            linux_target: x86_64-unknown-linux-gnu
+            label: manylinux_2_28-x86_64
+            artifact_label: -manylinux_2_28-x86_64
+            sdist: true
+          - os: ubuntu-latest
+            policy: 2_28
+            linux_target: aarch64-unknown-linux-gnu
+            label: manylinux_2_28-aarch64
+            artifact_label: -manylinux_2_28-aarch64
+          # Linux musllinux_1_2
+          - os: ubuntu-latest
+            policy: musllinux_1_2
+            linux_target: x86_64-unknown-linux-musl
+            label: musllinux_1_2-x86_64
+            artifact_label: -musllinux_1_2-x86_64
+          - os: ubuntu-latest
+            policy: musllinux_1_2
+            linux_target: aarch64-unknown-linux-musl
+            label: musllinux_1_2-aarch64
+            artifact_label: -musllinux_1_2-aarch64
+          # macOS universal2
+          - os: macos-14
+            policy: 2_28
+            label: macos-universal2
+            artifact_label: -universal2
+          # Windows x64 (MSVC)
+          - os: windows-latest
+            policy: 2_28
+            label: windows-amd64
+            artifact_label: -win_amd64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install zig (Linux only)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euxo pipefail
+          sudo apt-get update
+          # Prefer 'zig' if available; some images use 'ziglang' package name.
+          sudo apt-get install -y zig || sudo apt-get install -y ziglang
+
+      - name: Build wheels and sdist (core)
+        uses: ./.github/actions/maturin-build
+        with:
+          package_path: eventflow-core
+          manylinux: ${{ matrix.policy }}
+        env:
+          LINUX_TARGET: ${{ matrix.linux_target }}
+          MATURIN_USE_ZIG: '1'
+          EF_ARTIFACT_LABEL: ${{ matrix.artifact_label }}
+          EF_BUILD_SDIST: ${{ matrix.sdist && '1' || '0' }}
+
+  build-modules:
+    name: Build eventflow-modules (${{ matrix.label }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux manylinux_2_28
+          - os: ubuntu-latest
+            policy: 2_28
+            linux_target: x86_64-unknown-linux-gnu
+            label: manylinux_2_28-x86_64
+            artifact_label: -manylinux_2_28-x86_64
+            sdist: true
+          - os: ubuntu-latest
+            policy: 2_28
+            linux_target: aarch64-unknown-linux-gnu
+            label: manylinux_2_28-aarch64
+            artifact_label: -manylinux_2_28-aarch64
+          # Linux musllinux_1_2
+          - os: ubuntu-latest
+            policy: musllinux_1_2
+            linux_target: x86_64-unknown-linux-musl
+            label: musllinux_1_2-x86_64
+            artifact_label: -musllinux_1_2-x86_64
+          - os: ubuntu-latest
+            policy: musllinux_1_2
+            linux_target: aarch64-unknown-linux-musl
+            label: musllinux_1_2-aarch64
+            artifact_label: -musllinux_1_2-aarch64
+          # macOS universal2
+          - os: macos-14
+            policy: 2_28
+            label: macos-universal2
+            artifact_label: -universal2
+          # Windows x64 (MSVC)
+          - os: windows-latest
+            policy: 2_28
+            label: windows-amd64
+            artifact_label: -win_amd64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install zig (Linux only)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euxo pipefail
+          sudo apt-get update
+          sudo apt-get install -y zig || sudo apt-get install -y ziglang
+
+      - name: Build wheels and sdist (modules)
+        uses: ./.github/actions/maturin-build
+        with:
+          package_path: eventflow-modules
+          manylinux: ${{ matrix.policy }}
+        env:
+          LINUX_TARGET: ${{ matrix.linux_target }}
+          MATURIN_USE_ZIG: '1'
+          EF_ARTIFACT_LABEL: ${{ matrix.artifact_label }}
+          EF_BUILD_SDIST: ${{ matrix.sdist && '1' || '0' }}
+
+  publish:
+    name: Publish distributions
+    runs-on: ubuntu-latest
+    needs:
+      - build-core
+      - build-modules
+    steps:
+      - name: Download all wheel artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: "*-wheels-*"
+          path: dist
+          merge-multiple: true
+
+      - name: List downloaded artifacts
+        shell: bash
+        run: ls -R dist || true
+
+      - name: Select target repository
+        id: target
+        shell: bash
+        run: |
+          set -euo pipefail
+          # workflow_dispatch override
+          tgt="${{ github.event_name == 'workflow_dispatch' && inputs.target || '' }}"
+          ref="${{ github.ref_name }}"
+          if [[ -z "$tgt" ]]; then
+            if [[ "$ref" =~ (rc|a|b) ]]; then
+              tgt="testpypi"
+            else
+              tgt="pypi"
+            fi
+          fi
+          echo "target=$tgt" >> "$GITHUB_OUTPUT"
+
+      - name: Publish to TestPyPI
+        if: steps.target.outputs.target == 'testpypi'
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist
+          repository-url: https://test.pypi.org/legacy/
+          password: ${{ secrets.TEST_PYPI_API_TOKEN }}
+          skip-existing: true
+
+      - name: Publish to PyPI
+        if: steps.target.outputs.target == 'pypi'
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist
+          password: ${{ secrets.PYPI_API_TOKEN }}
+          skip-existing: true

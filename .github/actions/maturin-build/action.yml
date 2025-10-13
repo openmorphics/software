@@ -1,0 +1,70 @@
+name: Maturin build
+description: Build Python wheels and sdist with maturin
+inputs:
+  package_path:
+    description: Relative path to the package directory (e.g., eventflow-core)
+    required: true
+  manylinux:
+    description: Manylinux/musllinux policy (e.g., 2_28 or musllinux_1_2). Used on Linux only.
+    required: false
+    default: 2_28
+runs:
+  using: composite
+  steps:
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        components: rustfmt
+
+    - name: Install maturin
+      shell: bash
+      run: python -m pip install -U "maturin>=1,<2"
+
+    - name: Build wheels and sdist
+      shell: bash
+      working-directory: ${{ inputs.package_path }}
+      env:
+        # Optional env from caller for cross-compiling Linux aarch64/x86_64 with Zig
+        LINUX_TARGET: ${{ env.LINUX_TARGET }}
+        MATURIN_USE_ZIG: ${{ env.MATURIN_USE_ZIG }}
+        # Set to '1' in exactly one Linux job per package to create a single sdist
+        EF_BUILD_SDIST: ${{ env.EF_BUILD_SDIST }}
+        # Optional suffix appended to artifact name, provided by caller
+        EF_ARTIFACT_LABEL: ${{ env.EF_ARTIFACT_LABEL }}
+      run: |
+        set -euo pipefail
+
+        EXTRA_ARGS=""
+        SDIST_ARG=""
+        if [[ "${EF_BUILD_SDIST:-0}" == "1" ]]; then
+          SDIST_ARG="--sdist"
+        fi
+
+        if [[ "$RUNNER_OS" == "macOS" ]]; then
+          # Build a universal2 wheel on macOS (arm64 + x86_64)
+          EXTRA_ARGS="$EXTRA_ARGS --universal2"
+        fi
+
+        if [[ "$RUNNER_OS" == "Linux" ]]; then
+          # Apply requested manylinux/musllinux policy
+          EXTRA_ARGS="$EXTRA_ARGS --manylinux ${{ inputs.manylinux }}"
+          # If cross target requested (e.g., aarch64-unknown-linux-gnu or -musl), enable zig and set target
+          if [[ -n "${LINUX_TARGET:-}" ]]; then
+            export MATURIN_USE_ZIG="${MATURIN_USE_ZIG:-1}"
+            EXTRA_ARGS="$EXTRA_ARGS --target ${LINUX_TARGET}"
+          fi
+        fi
+
+        # maturin invokes auditwheel/delocate on Linux/macOS when not skipped
+        python -m maturin build -r ${SDIST_ARG} ${EXTRA_ARGS}
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.package_path }}-wheels-${{ runner.os }}-${{ runner.arch }}${{ env.EF_ARTIFACT_LABEL }}
+        path: ${{ inputs.package_path }}/target/wheels/*

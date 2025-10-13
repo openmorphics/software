@@ -50,4 +50,10 @@ def is_enabled() -> bool:
 # Export the native module under a stable name
 native = _native
 
+# Re-export set_log_sink if provided by native
+if _native is not None and hasattr(_native, "set_log_sink"):
+    set_log_sink = _native.set_log_sink  # type: ignore[attr-defined]
+
 __all__ = ["is_enabled", "native"]
+if _native is not None and hasattr(_native, "set_log_sink"):
+    __all__.append("set_log_sink")
