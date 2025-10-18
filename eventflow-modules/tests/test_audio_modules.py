@@ -1,7 +1,16 @@
-import unittest, math
+import unittest, math, os
 from collections import defaultdict
 from eventflow_core.runtime.exec import run_event_mode
-from eventflow_modules.audio import stft_frontend, mel_frontend, voice_activity, keyword_spotter
+from eventflow_modules.audio import (
+    stft_frontend,
+    mel_frontend,
+    voice_activity,
+    keyword_spotter,
+    build_always_on_graph,
+    run_instrumented_event_mode,
+    PipelineConfig,
+)
+from eventflow_modules.audio.always_on import main as audio_cli_main
 
 def sine_pcm(freq_hz=1000, dur_ms=200, sr=16000):
     n = int(sr * (dur_ms / 1000.0))
@@ -37,3 +46,21 @@ class TestAudioModules(unittest.TestCase):
         # We expect mel features; LIF may or may not spike depending on params
         self.assertIn("mel", out)
         self.assertGreater(len(out["mel"]), 0)
+
+    def test_always_on_smoke(self):
+        cfg = PipelineConfig()
+        g = build_always_on_graph()
+        report = run_instrumented_event_mode(
+            g,
+            {"stft": sine_pcm(1000, dur_ms=80, sr=16000)},
+            cfg,
+        )
+        self.assertGreaterEqual(report.mel_frames, 0)
+        self.assertIn("mel", report.per_node)
+
+    def test_always_on_cli_file_smoke(self):
+        wav = "examples/wakeword/audio.wav"
+        if not os.path.exists(wav):
+            self.skipTest("examples/wakeword/audio.wav not found")
+        rc = audio_cli_main(["file", "--path", wav, "--viz", "none", "--energy", "arm"])
+        self.assertEqual(rc, 0)

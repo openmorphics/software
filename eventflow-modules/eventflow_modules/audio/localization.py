@@ -11,6 +11,9 @@ def localization(
 ) -> EIRGraph:
     """
     DOA scaffold: STFT -> Mel -> Fuse (multi-band co-activity proxy).
+
+    SAL binding:
+      - Provide PCM events to node 'stft' at runtime.
     """
     p = params or {}
     n_fft = int(p.get("n_fft", 128))

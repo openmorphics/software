@@ -6,6 +6,7 @@ from .localization import localization
 from .frontend import stft_frontend, mel_frontend
 from .always_on import (
     build_always_on_graph,
+    run_instrumented_event_mode,
     run_wav_file,
     run_mic_live,
     PipelineConfig,
@@ -26,6 +27,7 @@ __all__ = [
     "stft_frontend",
     "mel_frontend",
     "build_always_on_graph",
+    "run_instrumented_event_mode",
     "run_wav_file",
     "run_mic_live",
     "PipelineConfig",

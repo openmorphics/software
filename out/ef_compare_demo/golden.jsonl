@@ -1,0 +1,3 @@
+{"type":"meta","note":"test"}
+{"type":"event","t_s":0.1,"payload":{"rng_draws":1.23,"num":5}}
+{"type":"deliver","t_s":0.2,"payload":{"num":10}}

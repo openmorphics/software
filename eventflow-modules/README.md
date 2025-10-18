@@ -84,3 +84,40 @@ Programmatic usage:
 
 Bench harness:
 - A benchmarking utility will be available under examples/always_on_audio/bench.py to sweep n_fft, hop, and n_mels across energy models and write CSV/JSON outputs.
+
+---
+
+## Parameter validation and error policy
+
+- Vision modules raise [VisionError](eventflow-modules/eventflow_modules/errors.py:18) for invalid parameters.
+- Other domain modules raise ValueError.
+- Many builders treat the first positional "source" argument as a SAL binding; you connect event iterators to specific node ids at run time.
+
+## Vision: Gesture detection usage
+
+- Builder: [gesture_detect()](eventflow-modules/eventflow_modules/vision/gesture_detect.py:5)
+
+Example:
+```python
+from eventflow_modules.vision import gesture_detect
+from eventflow_core.runtime.exec import run_event_mode
+
+def impulses(ts_list):
+    for t in ts_list:
+        yield (t, 0, 1.0, {"unit": "evt"})
+
+g = gesture_detect(None, window="5 ms", min_events=2)
+out = run_event_mode(g, {"id": impulses([0, 1_000_000])})
+# out["gesture"] contains coincidence events when conditions are met
+```
+
+## Robotics and Wellness updates
+
+- Reflex controller now validates inputs and has a smoke test; see [reflex_controller()](eventflow-modules/eventflow_modules/robotics/reflex.py:5).
+- Obstacle avoidance validates (window, min_count) and includes a smoke test; see [obstacle_avoidance()](eventflow-modules/eventflow_modules/robotics/obstacle.py:6).
+- HRV v1 proxy implemented via Delay+Fuse; see [hrv_index()](eventflow-modules/eventflow_modules/wellness/hrv.py:5).
+
+## Always-on Audio testing guidance
+
+- Programmatic smoke test runs [build_always_on_graph()](eventflow-modules/eventflow_modules/audio/always_on.py:77) and [run_instrumented_event_mode()](eventflow-modules/eventflow_modules/audio/always_on.py:251) on a synthetic sine source; see [tests/test_audio_modules.py](eventflow-modules/tests/test_audio_modules.py:50).
+- CLI smoke test: ef-audio-demo file --path examples/wakeword/audio.wav --viz none --energy arm; see [main()](eventflow-modules/eventflow_modules/audio/always_on.py:649).

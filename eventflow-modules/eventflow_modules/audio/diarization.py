@@ -11,6 +11,9 @@ def diarization(
 ) -> EIRGraph:
     """
     Simple diarization scaffold: STFT -> Mel -> Fuse (activity bursts).
+
+    SAL binding:
+      - Provide PCM events to node 'stft' at runtime.
     """
     p = params or {}
     n_fft = int(p.get("n_fft", 128))

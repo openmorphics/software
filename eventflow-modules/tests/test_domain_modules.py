@@ -1,11 +1,11 @@
 import unittest
 
 from eventflow_core.runtime.exec import run_event_mode
-from eventflow_modules.vision import optical_flow, corner_tracking, object_tracking
-from eventflow_modules.robotics import event_slam
-from eventflow_modules.timeseries import change_point, spike_pattern_mining
-from eventflow_modules.wellness import sleep_staging, stress_index
-from eventflow_modules.creative import bio_sequencer
+from eventflow_modules.vision import optical_flow, corner_tracking, object_tracking, gesture_detect
+from eventflow_modules.robotics import event_slam, reflex_controller, obstacle_avoidance
+from eventflow_modules.timeseries import change_point, spike_pattern_mining, anomaly_detector
+from eventflow_modules.wellness import sleep_staging, stress_index, hrv_index
+from eventflow_modules.creative import bio_sequencer, event_graphics, music_generator
 
 
 def dvs_stream_east(width=8, height=8, y=2, n=3, step_ms=1):
@@ -96,6 +96,57 @@ class TestTimeseriesWellnessCreative(unittest.TestCase):
         self.assertIn("sequencer", out)
         self.assertGreaterEqual(len(out["sequencer"]), 1)
 
+
+class TestAdditionalVision(unittest.TestCase):
+    def test_gesture_detect_basic(self):
+        g = gesture_detect(None, window="2 ms", min_events=2)
+        out = run_event_mode(g, {"id": impulses([0, 1_000_000])})
+        self.assertIn("gesture", out)
+        self.assertGreaterEqual(len(out["gesture"]), 1)
+
+
+class TestAdditionalRobotics(unittest.TestCase):
+    def test_reflex_controller_spikes(self):
+        g = reflex_controller(None, tau_m="5 ms", v_th=0.01)
+        out = run_event_mode(g, {"reflex": impulses([0, 1_000, 2_000])})
+        self.assertIn("reflex", out)
+        # Expect at least one spike for very low threshold
+        self.assertGreaterEqual(len(out["reflex"]), 1)
+
+    def test_obstacle_avoidance_basic(self):
+        g = obstacle_avoidance(None, window="2 ms", min_count=2)
+        out = run_event_mode(g, {"id": impulses([0, 1_000_000])})
+        self.assertIn("obstacle", out)
+        self.assertGreaterEqual(len(out["obstacle"]), 1)
+
+
+class TestAdditionalTWC(unittest.TestCase):
+    def test_anomaly_detector_spike(self):
+        g = anomaly_detector(None, threshold=0.1, tau_m="5 ms")
+        out = run_event_mode(g, {"anomaly": impulses([0])})
+        self.assertIn("anomaly", out)
+        self.assertGreaterEqual(len(out["anomaly"]), 1)
+
+    def test_hrv_index_proxy(self):
+        g = hrv_index(None, window="2 ms")
+        out = run_event_mode(g, {"id": impulses([0, 1_000_000])})
+        self.assertIn("hrv", out)
+        self.assertGreaterEqual(len(out["hrv"]), 1)
+
+    def test_event_graphics_passthrough(self):
+        g = event_graphics(None)
+        out = run_event_mode(g, {"gfx": impulses([0])})
+        self.assertIn("gfx", out)
+        self.assertGreaterEqual(len(out["gfx"]), 1)
+
+
+class TestAdditionalCreative(unittest.TestCase):
+    def test_music_generator_build_and_run(self):
+        g = music_generator(None, params={"tau_m": "5 ms", "v_th": 0.01})
+        out = run_event_mode(g, {"in": impulses([0])})
+        self.assertIn("neuron", out)
+        # Guard against runaway feedback producing absurd number of spikes
+        self.assertLess(len(out["neuron"]), 10000)
 
 if __name__ == "__main__":
     unittest.main()

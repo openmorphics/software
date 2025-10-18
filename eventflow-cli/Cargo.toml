@@ -1,0 +1,17 @@
+[package]
+name = "eventflow-cli"
+version = "0.1.0"
+edition = "2021"
+description = "EventFlow CLI utilities (additive Rust tool). Provides `ef compare` for UEC JSONL traces."
+
+# Keep dependencies minimal per PR scope
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[[bin]]
+name = "ef"
+path = "src/main.rs"
+
+[workspace]
+resolver = "2"

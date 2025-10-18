@@ -2,10 +2,12 @@ from __future__ import annotations
 import importlib
 import os
 import warnings
+import logging
 from typing import Optional
 
 _NATIVE_MODULE_NAME = "eventflow_modules._rust._vision_native"
 
+_logger = logging.getLogger(__name__)
 
 def _env_toggle() -> Optional[bool]:
     val = os.getenv("EF_NATIVE")
@@ -36,6 +38,10 @@ if _env is True and _native is None:
         RuntimeWarning,
         stacklevel=2,
     )
+
+# Informational log for automatic (unset EF_NATIVE) fallback
+if _env is None and _native is None:
+    _logger.info("eventflow-modules: native extension not found; using pure-Python implementation")
 
 
 def is_enabled() -> bool:

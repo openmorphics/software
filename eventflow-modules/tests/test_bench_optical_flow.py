@@ -31,9 +31,11 @@ def test_bench_optical_flow_stub(benchmark, impl: str):
     assert out.shape == (H, W)
     assert out.dtype == np.float32
 
+def _repo_root():
+    return os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+
 def _get_vision_trace_path():
-    # CWD is repo root, so path is relative to that.
-    path = "examples/vision_optical_flow/traces/inputs/vision.norm.jsonl"
+    path = os.path.join(_repo_root(), "examples/vision_optical_flow/traces/inputs/vision.norm.jsonl")
     if not os.path.exists(path):
         pytest.skip(f"Test trace not found at {os.path.abspath(path)}")
     return path
@@ -86,7 +88,7 @@ def test_bench_optical_flow_coo_from_jsonl(benchmark, impl):
         assert "ts" in events[0] and "idx" in events[0]
 
 def _load_golden_trace():
-    path = "examples/vision_optical_flow/traces/golden/vision.golden.jsonl"
+    path = os.path.join(_repo_root(), "examples/vision_optical_flow/traces/golden/vision.golden.jsonl")
     if not os.path.exists(path):
         pytest.skip(f"Golden trace not found at {os.path.abspath(path)}")
     
