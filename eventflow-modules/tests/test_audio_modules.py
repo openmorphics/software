@@ -33,12 +33,21 @@ class TestAudioModules(unittest.TestCase):
         self.assertLessEqual(abs(kmax - expected), 1)
 
     def test_vad_pipeline_outputs(self):
-        g = voice_activity(None, window="30 ms", min_bands=2, params={"n_fft": 64, "n_mels": 10, "hop": "8 ms", "sample_rate_hz": 16000})
+        g = voice_activity(
+            None,
+            window="30 ms",
+            min_bands=2,
+            params={"n_fft": 64, "n_mels": 10, "hop": "8 ms", "sample_rate_hz": 16000},
+            hangover="16 ms",
+        )
         out = run_event_mode(g, {"stft": sine_pcm(1200, dur_ms=150, sr=16000)})
         self.assertIn("mel", out)
         self.assertIn("vad", out)
         self.assertGreaterEqual(len(out["mel"]), 1)
         self.assertGreaterEqual(len(out["vad"]), 1)
+        # hangover path emits delayed copies of VAD events
+        self.assertIn("vad_hang", out)
+        self.assertGreaterEqual(len(out["vad_hang"]), 1)
 
     def test_kws_builds_and_runs(self):
         g = keyword_spotter(None, tau_m="8 ms", v_th=0.2, params={"n_fft": 64, "n_mels": 10, "hop": "8 ms", "sample_rate_hz": 16000})

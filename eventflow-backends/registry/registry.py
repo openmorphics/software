@@ -152,12 +152,78 @@ class GpuSimBackend:
 
 
 def list_backends() -> List[str]:
-    return ["cpu-sim", "gpu-sim"]
+    """
+    List available backends:
+      - Built-ins: cpu-sim, gpu-sim
+      - Vendor plugins discovered via importlib.metadata entry points under group 'eventflow_backends'
+        Each entry point name should be the backend id (e.g., 'acme-asic-x1').
+        The entry point value should resolve to either:
+          * a callable factory returning a backend instance with .plan()/.run(), or
+          * an object exposing get_backend(name)->instance, or
+          * a module/class providing a Backend() constructor.
+    """
+    names: List[str] = ["cpu-sim", "gpu-sim"]
+    try:
+        from importlib.metadata import entry_points
+        eps = entry_points()
+        # Python 3.10/3.11 compatibility:
+        # - 3.11+: EntryPoints has .select(group="...")
+        # - older: entry_points() returns dict-like mapping
+        if hasattr(eps, "select"):
+            eps = eps.select(group="eventflow_backends")  # type: ignore[attr-defined]
+        elif isinstance(eps, dict):
+            eps = eps.get("eventflow_backends", []) or []
+        else:
+            eps = []
+        ep_names = sorted({
+            getattr(ep, "name", None) for ep in (eps or [])
+            if getattr(ep, "name", None)
+        })
+        for n in ep_names:
+            if n not in names:
+                names.append(n)
+    except Exception as e:
+        _log.warning(f"entry-point discovery failed: {e}")
+    return names
 
 
 def load_backend(name: str):
+    """
+    Load a backend by id.
+    Resolution order:
+      1) Built-ins ('cpu-sim', 'gpu-sim')
+      2) Entry points under group 'eventflow_backends' with matching entry point name.
+         The resolved object may be:
+           - a callable factory -> instance
+           - an object exposing get_backend(name)
+           - a module/class exposing Backend() constructor
+    """
     if name == "cpu-sim":
         return CpuSimBackend()
     if name == "gpu-sim":
         return GpuSimBackend()
+    # Try entry-point plugins
+    try:
+        from importlib.metadata import entry_points
+        eps = entry_points()
+        if hasattr(eps, "select"):
+            eps = eps.select(group="eventflow_backends")  # type: ignore[attr-defined]
+        elif isinstance(eps, dict):
+            eps = eps.get("eventflow_backends", []) or []
+        else:
+            eps = []
+        for ep in (eps or []):
+            ep_name = getattr(ep, "name", None)
+            if ep_name == name:
+                obj = ep.load()
+                inst = obj() if callable(obj) else obj
+                if hasattr(inst, "plan") and hasattr(inst, "run"):
+                    return inst
+                if hasattr(inst, "get_backend"):
+                    return inst.get_backend(name)
+                if hasattr(inst, "Backend"):
+                    return inst.Backend()
+                raise TypeError(f"entry point '{name}' does not provide a backend instance/factory")
+    except Exception as e:
+        _log.warning(f"entry-point backend load failed for '{name}': {e}")
     raise ValueError(f"unknown backend '{name}'")
