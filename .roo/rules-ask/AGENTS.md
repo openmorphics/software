@@ -1,0 +1,12 @@
+# Project Documentation Rules (Non-Obvious Only)
+
+- ef.py is the canonical CLI for tests and examples; the installed "eventflow" script is not what tests invoke. See the test harness spawning ef.py with --json ([_run_ef()](eventflow-cli/tests/test_ef_cli_json.py:12), [CLI entry](eventflow-cli/ef.py:590)).
+- CLI JSON mode is controlled by a global flag set from --json; any added commands must respect dual-mode output (JSON vs text) ([printer contract](eventflow-cli/ef.py:139-159), [flag handling](eventflow-cli/ef.py:682-684)).
+- Dynamic loader design: ef.py resolves sibling packages by repo-relative paths; documentation and examples must instruct running from the repository root, not from subdirs or installed environments ([base_dir](eventflow-cli/ef.py:39), [validators loader](eventflow-cli/ef.py:85-95), [SAL loader](eventflow-cli/ef.py:97-107), [backend registry loader](eventflow-cli/ef.py:109-119), [comparator loader](eventflow-cli/ef.py:121-131)).
+- eventflow_cli subcommands intentionally lazy-import heavy deps to avoid parse-time failures; docs should note that import errors surface during handler execution, not at parser construction ([run.handle()](eventflow-cli/eventflow_cli/run.py:4-11), [build.handle()](eventflow-cli/eventflow_cli/build.py:4-10), [validate.handle()](eventflow-cli/eventflow_cli/validate.py:4-11)).
+- Packaging scope is intentionally narrow for v0.1: "build" accepts only .eir JSON and must reject Python builder paths; avoid documenting Python builders until scope broadens ([rule](eventflow-cli/eventflow_cli/build.py:13-19)).
+- Native acceleration docs: EF_NATIVE toggles behavior with tolerant fallback; users following docs must build the PyO3 module before expecting native paths to run (parity/bench tests otherwise skip) ([loader.is_enabled()](eventflow-core/eventflow_core/_rust/__init__.py:60), [build steps](eventflow-core/README.md:50-53)).
+- Example-driven expectations in tests:
+  - Trace comparator defaults and JSON output inspection ([compare-traces wiring](eventflow-cli/ef.py:672-679), [test usage](eventflow-cli/tests/test_ef_cli_json.py:57-61)).
+  - SAL passthrough plus telemetry fields required by tests (jitter metrics under clock) ([test assertions](eventflow-cli/tests/test_ef_cli_sal_and_run.py:60-63)).
+  - Backend "run" example uses bundled repo examples; docs should reference exact paths used in tests to avoid confusion ([example paths](eventflow-cli/tests/test_ef_cli_sal_and_run.py:66-83)).

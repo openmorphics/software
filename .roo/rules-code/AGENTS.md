@@ -1,0 +1,10 @@
+# Project Coding Rules (Non-Obvious Only)
+
+- Execute CLI-driven tests via the repo-local ef.py, not the installed console script. Tests spawn it with --json and expect the dynamic loaders to resolve sibling packages from repo-relative paths ([ef main()](eventflow-cli/ef.py:590), [base_dir](eventflow-cli/ef.py:39)).
+- Always run from the repository root; ef.py loaders compute paths relative to itself and load siblings directly ([validators loader](eventflow-cli/ef.py:85), [SAL loader](eventflow-cli/ef.py:97), [backend registry loader](eventflow-cli/ef.py:109), [comparator loader](eventflow-cli/ef.py:121)).
+- Maintain lazy-import pattern in eventflow_cli subcommands to avoid import-time hard deps during parse (this is intentional and test-covered): ([run.handle()](eventflow-cli/eventflow_cli/run.py:4-11), [build.handle()](eventflow-cli/eventflow_cli/build.py:4-10), [validate.handle()](eventflow-cli/eventflow_cli/validate.py:4-11)).
+- Preserve deterministic exit codes and dual output modes in ef.py:
+  - 0 success; 1 validation/conformance failures or runtime errors; 2 IO/argument errors ([validators exit paths](eventflow-cli/ef.py:199), [trace validation](eventflow-cli/ef.py:257), [profile errors](eventflow-cli/ef.py:393), [backend run](eventflow-cli/ef.py:563), [compare-traces](eventflow-cli/ef.py:580)).
+  - --json toggles machine-readable output via global CLI_JSON; do not print extra text in JSON mode ([printer](eventflow-cli/ef.py:139), [flag handling](eventflow-cli/ef.py:682)).
+- Keep packaging scope strict in v0.1: eventflow_cli.build only accepts .eir JSON and must error for Python builder paths (do not broaden) ([builder rule](eventflow-cli/eventflow_cli/build.py:13-19)).
+- Native acceleration is optional and toggled via EF_NATIVE with tolerant fallback; code paths must not hard-require the native module. Use the loader guard for behavior checks ([is_enabled()](eventflow-core/eventflow_core/_rust/__init__.py:60)).

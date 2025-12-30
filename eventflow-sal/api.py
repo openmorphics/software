@@ -71,6 +71,12 @@ def _dims_for_scheme(scheme: str) -> Tuple[List[str], str]:
         return (["band"], "dB")
     if scheme == "imu.6dof://":
         return (["axis"], "mixed")  # accel: m/s^2, gyro: rad/s
+    if scheme == "bio.ecg://":
+        return (["lead"], "mV")
+    if scheme == "bio.eeg://":
+        return (["electrode"], "uV")
+    if scheme == "bio.emg://":
+        return (["electrode"], "mV")
     # Fallback
     return (["ch"], "dimensionless")
 
@@ -81,7 +87,7 @@ def _idx_for_packet(scheme: str, pkt: EventPacket) -> List[int]:
         y = int(pkt.meta.get("y", 0))
         pol = int(pkt.meta.get("polarity", 0))
         return [x, y, pol]
-    # audio and imu are channel/axis indexed by packet.channel
+    # audio, imu, and bio signals are channel indexed by packet.channel
     return [int(pkt.channel)]
 
 

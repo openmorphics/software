@@ -1,6 +1,5 @@
 from __future__ import annotations
-from .client import HubClient
-from .registry import LocalRegistry
+from .client import HubClient, LocalRegistry
 from .pack import pack_bundle, unpack_bundle
 from .schemas import ModelCard, CapManifest, TraceMeta
 

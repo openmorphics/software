@@ -130,6 +130,18 @@ def _load_comparator():
         sys.exit(2)
 
 
+def _load_hub():
+    hpath = os.path.join(_base_dir(), "eventflow-cli", "eventflow_cli", "hub.py")
+    if not os.path.isfile(hpath):
+        print(f"fatal: hub CLI handler not found at {hpath}", file=sys.stderr)
+        sys.exit(2)
+    try:
+        return _load_module_with_fallback(hpath, "eventflow_cli_hub")
+    except Exception as e:
+        print(f"fatal: failed to load hub CLI handler: {e}", file=sys.stderr)
+        sys.exit(2)
+
+
 validators = _load_validators()
 
 # ------------------------------------------------------------
@@ -192,6 +204,43 @@ def cmd_list_backends(_args: argparse.Namespace) -> None:
 # ------------------------------------------------------------
 
 def cmd_validate_eir(args: argparse.Namespace) -> None:
+    """Validate an EventFlow Intermediate Representation (EIR) JSON document.
+
+    Performs comprehensive validation of EIR JSON files to ensure they conform
+    to the EventFlow specification. This includes structural validation,
+    type checking, and semantic correctness verification.
+
+    Args:
+        args: Parsed command-line arguments with attributes:
+            path (str): Path to the EIR JSON file to validate.
+                       Must be a valid JSON file containing EventFlow model definition.
+
+    Returns:
+        None: Exits with appropriate code instead of returning.
+
+    Exit codes:
+        0: Success - EIR document is valid with no issues
+        1: Validation failure - EIR document has structural or semantic issues
+        2: IO/argument error - Cannot load or parse the EIR JSON file
+
+    Output:
+        Prints validation issues to stderr in human-readable format.
+        Each issue includes severity, location, and description.
+
+    Raises:
+        SystemExit: Always exits with appropriate code rather than returning.
+
+    Example:
+        Validate an EIR file:
+
+        $ ef validate-eir --path my_model.eir
+        # No output if valid
+        # Issues printed if invalid
+
+    Note:
+        Uses the validators.validate_eir() function which performs
+        comprehensive checks on the EIR document structure and content.
+    """
     path = args.path
     try:
         obj = _read_json(path)
@@ -253,6 +302,45 @@ def cmd_validate_efpkg(args: argparse.Namespace) -> None:
 # ------------------------------------------------------------
 
 def cmd_validate_trace(args: argparse.Namespace) -> None:
+    """Validate an event tensor trace file in JSONL format.
+
+    Performs comprehensive validation of event tensor trace files to ensure
+    they conform to the EventFlow trace specification. This includes format
+    validation, event structure checking, and temporal ordering verification.
+
+    Args:
+        args: Parsed command-line arguments with attributes:
+            path (str): Path to the event tensor trace file to validate.
+                       Must be in JSONL format with one event per line.
+
+    Returns:
+        None: Exits with appropriate code instead of returning.
+
+    Exit codes:
+        0: Success - Trace file is valid with no issues
+        1: Validation failure - Trace file has structural or semantic issues
+        2: IO/argument error - Cannot access or read the trace file
+
+    Output:
+        Prints validation issues to stderr in human-readable format.
+        Each issue includes severity, line number, and description.
+
+    Raises:
+        SystemExit: Always exits with appropriate code rather than returning.
+
+    Example:
+        Validate a trace file:
+
+        $ ef validate-trace --path output_trace.jsonl
+        # No output if valid
+        # Issues printed if invalid, e.g.:
+        # ERROR line 5: invalid timestamp format
+        # WARNING line 12: missing neuron field
+
+    Note:
+        Uses validators.validate_event_tensor_jsonl_path() which performs
+        line-by-line validation of JSONL event tensor traces.
+    """
     path = args.path
     issues = validators.validate_event_tensor_jsonl_path(path)
     _print_issues(issues)
@@ -569,7 +657,74 @@ def cmd_run(args: argparse.Namespace) -> None:
 # Trace comparator (Phase 5)
 # ------------------------------------------------------------
 
+def cmd_hub(args: argparse.Namespace) -> None:
+    """Handle EventFlow Hub package management commands."""
+    hub_module = _load_hub()
+    hub_module.handle(args)
+
+
 def cmd_compare_traces(args: argparse.Namespace) -> None:
+    """Compare event tensor traces for conformance testing.
+
+    Performs detailed comparison between golden reference traces and candidate
+    traces to verify behavioral equivalence. Uses configurable tolerances for
+    time and numeric differences to account for numerical precision variations.
+
+    Args:
+        args: Parsed command-line arguments with attributes:
+            golden (str): Path to the golden reference trace file in JSONL format.
+                         This represents the expected correct behavior.
+            candidate (str): Path to the candidate trace file in JSONL format.
+                            This is the trace to be validated against the golden.
+            eps_time_us (float): Time tolerance in microseconds for event timing
+                                comparisons. Events are considered equivalent if
+                                their timestamps differ by less than this value.
+            eps_numeric (float): Numeric tolerance for value comparisons.
+                                Event values are considered equivalent if they
+                                differ by less than this relative/absolute value.
+
+    Returns:
+        None: Exits with appropriate code instead of returning.
+
+    Exit codes:
+        0: Success - Traces are equivalent within specified tolerances
+        1: Comparison failure - Traces differ beyond acceptable tolerances
+        2: IO/argument error - Cannot access or read trace files
+
+    Output:
+        With --json flag: Prints detailed comparison results as JSON including
+        match status, differences found, and statistics.
+        Without --json: Prints human-readable comparison report with summary
+        and detailed mismatch information.
+
+    Raises:
+        SystemExit: Always exits with appropriate code rather than returning.
+
+    Example:
+        Compare traces with tight tolerances:
+
+        $ ef compare-traces --golden ref.jsonl --candidate test.jsonl \\
+                            --eps-time-us 10.0 --eps-numeric 1e-6
+        Traces equivalent: 1247/1247 events matched
+        OK
+
+        Compare with relaxed tolerances and JSON output:
+
+        $ ef --json compare-traces --golden ref.jsonl --candidate test.jsonl \\
+                                 --eps-time-us 1000.0 --eps-numeric 0.01
+        {
+          "ok": true,
+          "events_total": 1247,
+          "events_matched": 1247,
+          "time_violations": 0,
+          "value_violations": 0
+        }
+
+    Note:
+        Uses comparator.compare_traces_jsonl() for high-performance trace
+        comparison with support for large JSONL files. Tolerances should be
+        chosen based on numerical precision characteristics of the target backend.
+    """
     comp = _load_comparator()
     res = comp.compare_traces_jsonl(
         golden_path=args.golden,
@@ -677,6 +832,12 @@ def main() -> None:
     s.add_argument("--eps-time-us", type=int, default=100, help="Time epsilon (microseconds)")
     s.add_argument("--eps-numeric", type=float, default=1e-5, help="Numeric epsilon (relative)")
     s.set_defaults(func=cmd_compare_traces)
+
+    # Hub
+    hub_module = _load_hub()
+    hub_parser = sub.add_parser("hub", help="EventFlow Hub package management")
+    hub_module.add_hub_subparser(hub_parser)
+    hub_parser.set_defaults(func=cmd_hub)
 
     args = p.parse_args()
     global CLI_JSON

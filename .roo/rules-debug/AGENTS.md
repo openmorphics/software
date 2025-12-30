@@ -1,0 +1,10 @@
+# Project Debug Rules (Non-Obvious Only)
+
+- Native acceleration is opt-in and may silently be inactive unless EF_NATIVE=1 and the PyO3 module is built: build native first with `cd eventflow-core && python -m pip install -U maturin && python -m maturin develop -r`; check enablement via [is_enabled()](eventflow-core/eventflow_core/_rust/__init__.py:60).
+- Loader policy when EF_NATIVE=1 but native import fails: only a warning is emitted and the system falls back to pure Python (no hard error) ([native loader](eventflow-core/eventflow_core/_rust/__init__.py:51-58)).
+- Bench speedup gates run only when EF_BENCH_GATE=1 is set; otherwise tests are skipped even if native exists ([bench gate docs](eventflow-core/README.md:90)).
+- CLI JSON mode shapes all outputs in ef.py; debugging tests that parse stdout must include --json, as the harness does ([harness spawn](eventflow-cli/tests/test_ef_cli_json.py:12), [json flag handling](eventflow-cli/ef.py:682-684)).
+- ef.py deterministic exit codes are part of the contract; incorrect exits cause confusing failures during debugging:
+  - 0 success; 1 validation/conformance or runtime errors; 2 IO/argument errors ([validators exit](eventflow-cli/ef.py:199-204), [trace validation](eventflow-cli/ef.py:255-260), [profile errors](eventflow-cli/ef.py:393-399), [backend run](eventflow-cli/ef.py:562-566), [compare-traces](eventflow-cli/ef.py:580-585)).
+- Running outside the repo root breaks ef.py’s dynamic loaders and yields misleading “not found” errors for sibling packages ([base_dir](eventflow-cli/ef.py:39), [validators loader](eventflow-cli/ef.py:85-95), [SAL loader](eventflow-cli/ef.py:97-107), [backend registry loader](eventflow-cli/ef.py:109-119), [comparator loader](eventflow-cli/ef.py:121-131)).
+- When debugging SAL/Backend issues, remember subcommands use lazy imports to avoid hard deps; import-time failures only surface inside handler execution, not at argparse parse-time ([run.handle()](eventflow-cli/eventflow_cli/run.py:4-11), [build.handle()](eventflow-cli/eventflow_cli/build.py:4-10), [validate.handle()](eventflow-cli/eventflow_cli/validate.py:4-11)).

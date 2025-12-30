@@ -11,7 +11,7 @@ Modules covered:
 - eventflow-hub
 
 Version targets:
-- Python >= 3.11
+- Python >= 3.9
 - Schema versions: Event Tensor JSONL 0.1.0, EIR 0.1.x
 
 1. Installation and environment setup
