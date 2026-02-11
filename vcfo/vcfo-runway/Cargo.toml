@@ -1,0 +1,18 @@
+[package]
+name = "vcfo-runway"
+version = "0.1.0"
+edition = "2021"
+description = "Runway calculator engine for Virtual CFO"
+license = "MIT OR Apache-2.0"
+authors = ["Virtual CFO Team"]
+
+[dependencies]
+vcfo-core = { path = "../vcfo-core" }
+chrono = { workspace = true }
+rust_decimal = { workspace = true }
+uuid = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
