@@ -24,3 +24,4 @@ def soil_ph_event(t,depth_cm,ph_value,u:MagUnit="pH")->EventPacket: return Event
 def nutrient_event(t,nutrient_type,concentration,u:MagUnit="ppm")->EventPacket: return EventPacket(t,0,float(concentration),{"unit":u,"nutrient":nutrient_type,"concentration":concentration})
 def weather_event(t,sensor_type,value,u:MagUnit="dimensionless")->EventPacket: return EventPacket(t,0,float(value),{"unit":u,"sensor_type":sensor_type,"value":value})
 def crop_sensor_event(t,x,y,measurement,u:MagUnit="dimensionless")->EventPacket: return EventPacket(t,0,float(measurement),{"unit":u,"x":x,"y":y,"measurement":measurement})
+def generic_event(t,data,u:MagUnit="dimensionless")->EventPacket: return EventPacket(t,0,0.0,{"unit":u,"data":data})

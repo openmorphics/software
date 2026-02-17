@@ -3,11 +3,11 @@
 This guide explains how to create an out‑of‑tree vendor backend that integrates with EventFlow. It covers two integration modes, packaging with Python entry points for auto‑discovery, a minimal sample backend that initially wraps the core runtime for execution, and sample Device Capability Descriptors (DCDs) with supported ops subsets.
 
 Authoritative references in this repo:
-- Backends registry and simulators: [eventflow-backends/registry/registry.py](eventflow-backends/registry/registry.py), [eventflow-backends/cpu_sim/executor.py](eventflow-backends/cpu_sim/executor.py), [eventflow-backends/gpu_sim/executor.py](eventflow-backends/gpu_sim/executor.py)
+- Backends registry and simulators: [eventflow-backends/eventflow_backends/registry.py](eventflow-backends/eventflow_backends/registry.py), [eventflow-backends/eventflow_backends/cpu_sim/executor.py](eventflow-backends/eventflow_backends/cpu_sim/executor.py), [eventflow-backends/eventflow_backends/gpu_sim/executor.py](eventflow-backends/eventflow_backends/gpu_sim/executor.py)
 - Backend API (optional compile/run_graph interface): [eventflow-backends/eventflow_backends/api.py](eventflow-backends/eventflow_backends/api.py)
 - Core runtime execution helpers (for prototypes/fallbacks): [eventflow-core/eventflow_core/runtime/exec.py](eventflow-core/eventflow_core/runtime/exec.py)
-- Conformance comparator (trace equivalence): [eventflow-core/conformance/comparator.py](eventflow-core/conformance/comparator.py)
-- DCD validator and schema (see also docs/specs/*): [eventflow-core/validators.py](eventflow-core/validators.py)
+- Conformance comparator (trace equivalence): [eventflow-core/eventflow_core/conformance/comparator.py](eventflow-core/eventflow_core/conformance/comparator.py)
+- DCD validator and schema (see also docs/specs/*): [eventflow-core/eventflow_core/validators.py](eventflow-core/eventflow_core/validators.py)
 
 What you will build
 - A vendor backend Python package (e.g., eventflow-backends-acme) that:
@@ -267,7 +267,7 @@ Troubleshooting
 - ef build fails due to time epsilon:
   - Adjust EIR time.epsilon_time_us or DCD time_resolution_ns/clock constraints; for fixed_step, quantize dt to your device resolution.
 - ef run writes empty/short trace:
-  - Validate input JSONL with ef validate-trace --path <file>, ensure header/records format and units (microseconds).
+  - Validate input JSONL with ef validate --trace --path <file>, ensure header/records format and units (microseconds).
 - compare-traces mismatch:
   - Inspect dt/idx mismatches; ensure your emitted idx order and time rounding match the canonical ordering.
 

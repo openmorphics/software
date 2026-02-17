@@ -1,0 +1,141 @@
+name: ci-fast
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+jobs:
+  fast:
+    name: ci-fast (${{ matrix.label }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            label: linux
+          - os: macos-14
+            label: macos
+          - os: windows-latest
+            label: windows
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install packages and test deps
+        run: |
+          python -m pip install -U pip
+          python -m pip install -e ./eventflow-core
+          python -m pip install -e ./eventflow-sal
+          python -m pip install -e ./eventflow-backends
+          python -m pip install -e ./eventflow-cli
+          python -m pip install -e ./eventflow-modules
+          python -m pip install -e ./eventflow-hub
+          python -m pip install pytest numpy pytest-cov coverage
+
+      - name: Run fast test gate (linux with coverage gates)
+        if: matrix.label == 'linux'
+        run: |
+          python -m pytest -q -rs \
+            --cov=eventflow_core \
+            --cov=eventflow_backends \
+            --cov=eventflow_cli \
+            --cov=eventflow_sal \
+            --cov=eventflow_modules \
+            --cov=eventflow_hub \
+            --cov-branch \
+            --cov-report=json:out/coverage.ci.json
+          python tools/check_coverage_gates.py --coverage-json out/coverage.ci.json
+
+      - name: Run fast test gate (macos/windows)
+        if: matrix.label != 'linux'
+        run: |
+          python -m pytest -q -rs
+
+  artifact-smoke:
+    name: artifact-smoke (linux)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Build wheels for all packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install -U pip build
+          mkdir -p dist
+          for pkg in eventflow-core eventflow-sal eventflow-backends eventflow-cli eventflow-modules eventflow-hub; do
+            python -m build --wheel -o dist "$pkg"
+          done
+          ls -la dist
+
+      - name: Install wheels in clean venv
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m venv .venv
+          . .venv/bin/activate
+          python -m pip install -U pip
+          python -m pip install dist/*.whl
+
+      - name: Run installed artifact smoke tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          . .venv/bin/activate
+          python - <<'PY'
+          import json
+          import pathlib
+          import subprocess
+
+          def run(*args: str):
+              proc = subprocess.run(["eventflow", *args], capture_output=True, text=True, check=False)
+              if proc.returncode != 0:
+                  raise SystemExit(f"command failed rc={proc.returncode}: {' '.join(args)}\nstdout={proc.stdout}\nstderr={proc.stderr}")
+              try:
+                  return json.loads(proc.stdout)
+              except Exception as exc:
+                  raise SystemExit(f"invalid JSON output for {' '.join(args)}: {exc}\nstdout={proc.stdout}") from exc
+
+          ver = run("--json", "version")
+          if "version" not in ver:
+              raise SystemExit("version payload missing 'version'")
+
+          backends = run("--json", "list-backends")
+          names = backends.get("backends", [])
+          if "cpu-sim" not in names:
+              raise SystemExit(f"cpu-sim missing from backend list: {names}")
+
+          trace_out = pathlib.Path("out/ci_fast_artifact_smoke.trace.jsonl")
+          trace_out.parent.mkdir(parents=True, exist_ok=True)
+          res = run(
+              "--json",
+              "run",
+              "--eir",
+              "examples/wakeword/eir.json",
+              "--backend",
+              "cpu-sim",
+              "--input",
+              "examples/wakeword/traces/inputs/audio_sample.jsonl",
+              "--trace-out",
+              str(trace_out),
+          )
+          if res.get("status") != "ok" or not trace_out.is_file():
+              raise SystemExit(f"run smoke failed: {res}")
+          PY

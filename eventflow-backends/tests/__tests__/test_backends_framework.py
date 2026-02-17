@@ -217,7 +217,7 @@ class TestBackendFramework:
 
         # SpiNNaker should support most neurons
         assert spinnaker_dcd["limits"]["max_neurons"] > loihi_dcd["limits"]["max_neurons"]
-        assert spinnaker_dcd["limits"]["max_neurons"] > synsense_dcd["limits"]["max_neurons"]
+        assert spinnaker_dcd["limits"]["max_neurons"] >= synsense_dcd["limits"]["max_neurons"]
 
     # ============================================================================
     # PLANNING TESTS

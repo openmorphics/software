@@ -21,7 +21,7 @@ Quick Start
     --out out/audio_bands.jsonl --telemetry-out out/audio_bands.telemetry.json
 
 API
-- [api.py](eventflow-sal/api.py) exposes stream_to_jsonl(uri, out, **opts) → telemetry dict
+- [stream.py](eventflow-sal/eventflow_sal/stream.py) exposes stream_to_jsonl(uri, out, **opts) → telemetry dict
 - Drivers and registry:
   - [registry.py](eventflow-sal/eventflow_sal/registry.py)
   - [drivers/dvs.py](eventflow-sal/eventflow_sal/drivers/dvs.py)

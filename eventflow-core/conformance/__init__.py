@@ -1,3 +1,0 @@
-"""
-EventFlow submodule (stub)
-"""

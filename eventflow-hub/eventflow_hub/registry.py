@@ -1,7 +1,7 @@
 from __future__ import annotations
-import json, os, shutil, hashlib
+import json, os, shutil
 from typing import Dict, Optional, List, Any
-from datetime import datetime
+from datetime import datetime, timezone
 
 INDEX = "index.json"
 
@@ -42,7 +42,7 @@ class PackageRegistry:
             "domains": manifest["model"].get("domains", []),
             "sdk_version": manifest["sdk_version"],
             "created_at": manifest.get("created_at"),
-            "uploaded_at": datetime.utcnow().isoformat() + "Z",
+            "uploaded_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
             "size_bytes": self._get_dir_size(os.path.dirname(manifest_path))
         }
 
@@ -149,3 +149,56 @@ class PackageRegistry:
         del self._index[key]
         self._save_index()
         return True
+
+
+class LocalRegistry:
+    """
+    Backward-compatible local bundle registry used by legacy tests and scripts.
+
+    Stores tarball bundles by key (`name:version`) and provides simple
+    add/get/list helpers.
+    """
+
+    def __init__(self, root: str):
+        self.root = root
+        self.bundles_dir = os.path.join(root, "bundles")
+        self.index_path = os.path.join(root, INDEX)
+        os.makedirs(self.bundles_dir, exist_ok=True)
+        self._index: Dict[str, str] = self._load_index()
+
+    def _load_index(self) -> Dict[str, str]:
+        if os.path.isfile(self.index_path):
+            with open(self.index_path, "r", encoding="utf-8") as f:
+                obj = json.load(f)
+            if isinstance(obj, dict):
+                return {str(k): str(v) for k, v in obj.items()}
+        return {}
+
+    def _save_index(self) -> None:
+        with open(self.index_path, "w", encoding="utf-8") as f:
+            json.dump(self._index, f, indent=2)
+
+    def add(self, name: str, version: str, bundle_path: str) -> str:
+        if not os.path.isfile(bundle_path):
+            raise FileNotFoundError(bundle_path)
+        key = f"{name}:{version}"
+        if key in self._index:
+            raise ValueError(f"Package {key} already exists")
+
+        if bundle_path.endswith(".tar.gz"):
+            out_name = f"{name}-{version}.tar.gz"
+        else:
+            _, ext = os.path.splitext(bundle_path)
+            out_name = f"{name}-{version}{ext or '.bundle'}"
+        out_path = os.path.join(self.bundles_dir, out_name)
+        shutil.copy2(bundle_path, out_path)
+
+        self._index[key] = out_path
+        self._save_index()
+        return key
+
+    def get(self, name: str, version: str) -> Optional[str]:
+        return self._index.get(f"{name}:{version}")
+
+    def list(self) -> List[str]:
+        return sorted(self._index.keys())

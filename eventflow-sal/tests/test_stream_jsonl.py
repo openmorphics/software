@@ -2,28 +2,14 @@ from __future__ import annotations
 import io, json, os, tempfile, unittest
 from typing import List
 
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+PKG_DIR = os.path.join(BASE_DIR, "eventflow-sal")
+if PKG_DIR not in os.sys.path:
+    os.sys.path.insert(0, PKG_DIR)
+
 from eventflow_sal import __name__ as _pkg  # ensure package import works
-# High-level SAL API we added
 from eventflow_sal import open as _unused  # noqa: F401 just to assert module exists
-import importlib.util
-import importlib.machinery
-import types
-
-
-def _load_sal_api_top() -> types.ModuleType:
-    """
-    Load top-level SAL API module (eventflow-sal/api.py) to access stream_to_jsonl
-    without relying on sys.path package layout in tests.
-    """
-    root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-    sal_api_path = os.path.join(root, "eventflow-sal", "api.py")
-    if not os.path.isfile(sal_api_path):
-        raise FileNotFoundError(f"SAL API not found at {sal_api_path}")
-    spec = importlib.util.spec_from_file_location("eventflow_sal_top_api", sal_api_path)
-    assert spec and spec.loader
-    mod = importlib.util.module_from_spec(spec)  # type: ignore[arg-type]
-    spec.loader.exec_module(mod)  # type: ignore[union-attr]
-    return mod
+from eventflow_sal.stream import stream_to_jsonl
 
 
 class TestSALStreamJSONL(unittest.TestCase):
@@ -59,9 +45,7 @@ class TestSALStreamJSONL(unittest.TestCase):
         ]
         self._write_jsonl(src_path, events)
 
-        # Use top-level SAL API (eventflow-sal/api.py) to stream
-        sal_api = _load_sal_api_top()
-        tele = sal_api.stream_to_jsonl(
+        tele = stream_to_jsonl(
             f"vision.dvs://file?format=jsonl&path={src_path}",
             out_path,
             telemetry_out=tel_path,
@@ -99,8 +83,7 @@ class TestSALStreamJSONL(unittest.TestCase):
             f.write(json.dumps({"ts": 0, "idx": [0], "val": 1.0}) + "\n")
             f.write(json.dumps({"ts": 100, "idx": [1], "val": 2.0}) + "\n")
 
-        sal_api = _load_sal_api_top()
-        tele = sal_api.stream_to_jsonl(
+        tele = stream_to_jsonl(
             f"vision.dvs://file?format=jsonl&path={src_path}",
             out_path,
         )

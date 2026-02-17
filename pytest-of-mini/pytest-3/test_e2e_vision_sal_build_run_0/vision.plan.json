@@ -1,0 +1,108 @@
+{
+  "backend": {
+    "name": "cpu-sim",
+    "version": "0.1.0",
+    "mode": "exact_event"
+  },
+  "graph": {
+    "id": "vision_optical_flow",
+    "profile": "REALTIME",
+    "seed": 7
+  },
+  "partitions": [
+    {
+      "id": "p0",
+      "nodes": [
+        "flow",
+        "delay",
+        "probe_flow"
+      ],
+      "placement": {
+        "chip": 0,
+        "core": 0
+      },
+      "resources": {},
+      "emulated": true
+    }
+  ],
+  "schedule": [
+    {
+      "partition_id": "p0",
+      "policy": "event",
+      "dt_us": null,
+      "priority": 0,
+      "affinity": 0
+    }
+  ],
+  "probes": [
+    {
+      "id": "p_flow",
+      "target": "flow",
+      "type": "custom",
+      "window_us": 10000
+    }
+  ],
+  "epsilons": {
+    "time_us": 50,
+    "numeric": 1e-05
+  },
+  "warnings": [],
+  "capabilities": {
+    "device": {
+      "name": "cpu-sim",
+      "version": "0.1.0"
+    },
+    "supported_ops": [
+      "conv1d_events",
+      "conv2d_events",
+      "delay_line",
+      "lif",
+      "probe_spike",
+      "synapse_exp",
+      "threshold_events",
+      "window_reduce_events"
+    ],
+    "deterministic_modes": [
+      "exact_event",
+      "fixed_step"
+    ],
+    "conformance_profiles": [
+      "BASE",
+      "REALTIME"
+    ],
+    "emulated_nodes": [
+      {
+        "id": "flow",
+        "kind": "kernel",
+        "op": "optical_flow_events"
+      }
+    ]
+  },
+  "negotiation": {
+    "time": {
+      "eir_unit": "us",
+      "device_resolution_ns": 1000,
+      "resolution_us": 1.0,
+      "mode": "exact_event",
+      "worst_case_quantization_us": 0.5,
+      "meets_epsilon": true
+    },
+    "profile": {
+      "eir_profile": "REALTIME",
+      "supported": true
+    },
+    "ops": {
+      "total_nodes": 3,
+      "unsupported_ops": [
+        "optical_flow_events"
+      ],
+      "emulated_count": 1
+    },
+    "policies": {
+      "requested": "drop_tail",
+      "device": "drop_tail",
+      "action": "match"
+    }
+  },
+  "notes": "cpu-sim plan (deterministic executor with capability negotiation)"
+}

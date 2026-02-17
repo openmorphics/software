@@ -1,0 +1,412 @@
+syntax = "proto3";
+
+package eventflow.v1;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/struct.proto";
+
+// Common messages
+message ValidationIssue {
+  enum Severity {
+    INFO = 0;
+    WARNING = 1;
+    ERROR = 2;
+  }
+  Severity severity = 1;
+  string code = 2;
+  string message = 3;
+  Location location = 4;
+}
+
+message Location {
+  string path = 1;
+  int32 line = 2;
+  int32 column = 3;
+}
+
+message ValidationResponse {
+  bool valid = 1;
+  repeated ValidationIssue issues = 2;
+}
+
+// Health service
+service HealthService {
+  rpc Check(HealthCheckRequest) returns (HealthCheckResponse);
+  rpc Watch(HealthWatchRequest) returns (stream HealthCheckResponse);
+}
+
+message HealthCheckRequest {
+  string service = 1;
+}
+
+message HealthCheckResponse {
+  enum Status {
+    UNKNOWN = 0;
+    SERVING = 1;
+    NOT_SERVING = 2;
+    SERVICE_UNKNOWN = 3;
+  }
+  Status status = 1;
+  string version = 2;
+  google.protobuf.Timestamp timestamp = 3;
+  int64 uptime_seconds = 4;
+  int32 active_jobs = 5;
+}
+
+message HealthWatchRequest {
+  string service = 1;
+}
+
+// Validation service
+service ValidationService {
+  rpc ValidateEIR(ValidateEIRRequest) returns (ValidationResponse);
+  rpc ValidateEventTensor(ValidateEventTensorRequest) returns (ValidationResponse);
+  rpc ValidateDCD(ValidateDCDRequest) returns (ValidationResponse);
+  rpc ValidatePackage(ValidatePackageRequest) returns (ValidationResponse);
+}
+
+message ValidateEIRRequest {
+  google.protobuf.Struct eir = 1;
+}
+
+message ValidateEventTensorRequest {
+  oneof format {
+    google.protobuf.Struct json = 1;
+    string jsonl_content = 2;
+  }
+}
+
+message ValidateDCDRequest {
+  google.protobuf.Struct dcd = 1;
+}
+
+message ValidatePackageRequest {
+  string root_directory = 1;
+  google.protobuf.Struct manifest = 2;
+}
+
+// Model management service
+service ModelService {
+  rpc ListModels(ListModelsRequest) returns (ListModelsResponse);
+  rpc GetModel(GetModelRequest) returns (Model);
+  rpc UploadModel(UploadModelRequest) returns (Model);
+  rpc DeleteModel(DeleteModelRequest) returns (google.protobuf.Empty);
+}
+
+message ListModelsRequest {
+  string profile = 1;
+  string domain = 2;
+  int32 page_size = 3;
+  string page_token = 4;
+}
+
+message ListModelsResponse {
+  repeated ModelSummary models = 1;
+  string next_page_token = 2;
+}
+
+message ModelSummary {
+  string id = 1;
+  string name = 2;
+  string version = 3;
+  string profile = 4;
+  string domain = 5;
+  google.protobuf.Timestamp created_at = 6;
+}
+
+message Model {
+  ModelSummary summary = 1;
+  string description = 2;
+  string author = 3;
+  string license = 4;
+  int64 eir_size_bytes = 5;
+  repeated string capabilities = 6;
+  google.protobuf.Struct eir_content = 7;
+}
+
+message GetModelRequest {
+  string model_id = 1;
+}
+
+message UploadModelRequest {
+  string name = 1;
+  string version = 2;
+  string description = 3;
+  string profile = 4;
+  string domain = 5;
+  google.protobuf.Struct eir = 6;
+  oneof golden_trace {
+    google.protobuf.Struct json_trace = 7;
+    string jsonl_trace_content = 8;
+  }
+}
+
+message DeleteModelRequest {
+  string model_id = 1;
+}
+
+// Execution service
+service ExecutionService {
+  rpc BuildPlan(BuildPlanRequest) returns (ExecutionPlan);
+  rpc Execute(ExecuteRequest) returns (ExecuteResponse);
+  rpc ExecuteAsync(ExecuteRequest) returns (ExecutionJob);
+  rpc GetJobStatus(GetJobStatusRequest) returns (ExecutionJob);
+  rpc CancelJob(CancelJobRequest) returns (google.protobuf.Empty);
+}
+
+message BuildPlanRequest {
+  string model_id = 1;
+  string backend = 2;
+  map<string, google.protobuf.Value> parameters = 3;
+}
+
+message ExecutionPlan {
+  string plan_id = 1;
+  string backend = 2;
+  int64 estimated_time_us = 3;
+  double memory_estimate_mb = 4;
+  google.protobuf.Struct plan_details = 5;
+}
+
+message ExecuteRequest {
+  string model_id = 1;
+  string backend = 2;
+  repeated InputData inputs = 3;
+  string plan_id = 4;
+  map<string, google.protobuf.Value> parameters = 5;
+}
+
+message InputData {
+  string uri = 1;
+  string format = 2;
+  oneof data {
+    google.protobuf.Struct json_data = 3;
+    string jsonl_content = 4;
+  }
+}
+
+message ExecuteResponse {
+  string job_id = 1;
+  ExecutionStatus status = 2;
+  repeated TraceOutput traces = 3;
+  int64 execution_time_us = 4;
+  string error = 5;
+}
+
+message ExecutionJob {
+  string job_id = 1;
+  ExecutionStatus status = 2;
+  google.protobuf.Timestamp created_at = 3;
+  double progress_percent = 4;
+  google.protobuf.Timestamp estimated_completion = 5;
+  string error = 6;
+}
+
+enum ExecutionStatus {
+  UNKNOWN = 0;
+  QUEUED = 1;
+  RUNNING = 2;
+  COMPLETED = 3;
+  FAILED = 4;
+  CANCELLED = 5;
+}
+
+message TraceOutput {
+  string trace_id = 1;
+  string format = 2;
+  string download_url = 3;
+  int64 size_bytes = 4;
+}
+
+message GetJobStatusRequest {
+  string job_id = 1;
+}
+
+message CancelJobRequest {
+  string job_id = 1;
+}
+
+// Trace and analysis service
+service TraceService {
+  rpc GetTrace(GetTraceRequest) returns (stream TraceData);
+  rpc GetTraceProfile(GetTraceProfileRequest) returns (TraceProfile);
+  rpc CompareTraces(CompareTracesRequest) returns (ComparisonResult);
+}
+
+message GetTraceRequest {
+  string trace_id = 1;
+  string format = 2; // "json" or "jsonl"
+}
+
+message TraceData {
+  oneof data {
+    google.protobuf.Struct json_record = 1;
+    string jsonl_line = 2;
+  }
+}
+
+message GetTraceProfileRequest {
+  string trace_id = 1;
+}
+
+message TraceProfile {
+  string path = 1;
+  int64 count = 2;
+  int64 duration_us = 3;
+  double events_per_second = 4;
+  double val_min = 5;
+  double val_max = 6;
+  double val_mean = 7;
+  repeated ChannelStats top_channels = 8;
+  google.protobuf.Struct header = 9;
+}
+
+message ChannelStats {
+  int32 channel = 1;
+  int64 count = 2;
+}
+
+message CompareTracesRequest {
+  string golden_trace_id = 1;
+  string candidate_trace_id = 2;
+  int64 eps_time_us = 3;
+  double eps_numeric = 4;
+}
+
+message ComparisonResult {
+  bool ok = 1;
+  int64 events_total = 2;
+  int64 events_matched = 3;
+  int64 time_violations = 4;
+  int64 value_violations = 5;
+  int64 max_time_error_us = 6;
+  double max_value_error = 7;
+  repeated DetailedViolation violations = 8;
+}
+
+message DetailedViolation {
+  int64 event_index = 1;
+  string violation_type = 2; // "time" or "value"
+  int64 time_error_us = 3;
+  double value_error = 4;
+}
+
+// SAL streaming service
+service SALService {
+  rpc StreamSAL(StreamSALRequest) returns (stream SALData);
+  rpc StreamSALToFile(StreamSALToFileRequest) returns (SALResult);
+}
+
+message StreamSALRequest {
+  string uri = 1;
+  SALParameters parameters = 2;
+}
+
+message StreamSALToFileRequest {
+  string uri = 1;
+  string output_uri = 2;
+  SALParameters parameters = 3;
+}
+
+message SALParameters {
+  int32 sample_rate = 1;
+  int32 window_ms = 2;
+  int32 hop_ms = 3;
+  int32 bands = 4;
+  int32 rate_limit_keps = 5;
+  string overflow_policy = 6; // "drop_head", "drop_tail", "block"
+  string telemetry_out = 7;
+}
+
+message SALData {
+  oneof data {
+    google.protobuf.Struct json_record = 1;
+    string jsonl_line = 2;
+  }
+}
+
+message SALResult {
+  string output_uri = 1;
+  google.protobuf.Struct telemetry = 2;
+  int64 records_processed = 3;
+}
+
+// Backend management service
+service BackendService {
+  rpc ListBackends(ListBackendsRequest) returns (ListBackendsResponse);
+  rpc GetBackend(GetBackendRequest) returns (Backend);
+  rpc GetBackendCapabilities(GetBackendCapabilitiesRequest) returns (BackendCapabilities);
+}
+
+message ListBackendsRequest {
+  // Empty request
+}
+
+message ListBackendsResponse {
+  repeated BackendSummary backends = 1;
+}
+
+message BackendSummary {
+  string name = 1;
+  string type = 2; // "cpu", "gpu", "neuromorphic"
+  string status = 3; // "available", "busy", "offline"
+  string version = 4;
+}
+
+message Backend {
+  BackendSummary summary = 1;
+  string description = 2;
+  BackendCapabilities capabilities = 3;
+  google.protobuf.Struct config = 4;
+}
+
+message GetBackendRequest {
+  string backend_name = 1;
+}
+
+message GetBackendCapabilitiesRequest {
+  string backend_name = 1;
+}
+
+message BackendCapabilities {
+  repeated string supported_operations = 1;
+  repeated string supported_profiles = 2;
+  int64 max_memory_mb = 3;
+  double max_throughput_keps = 4;
+  repeated string supported_formats = 5;
+  google.protobuf.Struct device_info = 6;
+}
+
+// Event streaming service for real-time applications
+service EventStreamingService {
+  rpc StreamExecutionEvents(StreamExecutionEventsRequest) returns (stream ExecutionEvent);
+  rpc SubscribeToModelEvents(SubscribeToModelEventsRequest) returns (stream ModelEvent);
+}
+
+message StreamExecutionEventsRequest {
+  string job_id = 1;
+  repeated string event_types = 2; // ["progress", "trace", "error"]
+}
+
+message ExecutionEvent {
+  string job_id = 1;
+  string event_type = 2;
+  google.protobuf.Timestamp timestamp = 3;
+  oneof payload {
+    double progress_percent = 4;
+    google.protobuf.Struct trace_data = 5;
+    string error_message = 6;
+  }
+}
+
+message SubscribeToModelEventsRequest {
+  string model_id = 1;
+  repeated string event_types = 2; // ["executed", "validated", "updated"]
+}
+
+message ModelEvent {
+  string model_id = 1;
+  string event_type = 2;
+  google.protobuf.Timestamp timestamp = 3;
+  google.protobuf.Struct event_data = 4;
+}

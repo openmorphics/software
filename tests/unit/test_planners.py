@@ -1,27 +1,15 @@
 import json
 import os
 import unittest
-import importlib.util
 from typing import Any
 
-
-def _load_module_from(path: str, name: str):
-    import sys
-    spec = importlib.util.spec_from_file_location(name, path)
-    if spec is None or spec.loader is None:
-        raise RuntimeError(f"cannot load module {name} from {path}")
-    mod = importlib.util.module_from_spec(spec)  # type: ignore
-    # Register in sys.modules before executing to satisfy dataclasses/typing introspection
-    sys.modules[name] = mod
-    spec.loader.exec_module(mod)  # type: ignore
-    return mod
-
-
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-REGISTRY = _load_module_from(
-    os.path.join(BASE_DIR, "eventflow-backends", "registry", "registry.py"),
-    "eventflow_backend_registry_test",
-)
+for rel in ("eventflow-core", "eventflow-backends"):
+    path = os.path.join(BASE_DIR, rel)
+    if path not in os.sys.path:
+        os.sys.path.insert(0, path)
+
+from eventflow_backends import load_backend
 
 
 def _minimal_eir(
@@ -52,19 +40,19 @@ def _minimal_eir(
 
 class TestPlanners(unittest.TestCase):
     def test_cpu_sim_profile_incompat_raises(self):
-        backend = REGISTRY.load_backend("cpu-sim")
+        backend = load_backend("cpu-sim")
         eir = _minimal_eir(profile="LEARNING")  # cpu-sim supports BASE/REALTIME in example DCD
         with self.assertRaisesRegex(ValueError, "backend\\.unsupported_profile"):
             backend.plan(eir)
 
     def test_cpu_sim_exact_event_epsilon_violation(self):
-        backend = REGISTRY.load_backend("cpu-sim")
+        backend = load_backend("cpu-sim")
         eir = _minimal_eir(profile="BASE", mode="exact_event", eps_time_us=0)
         with self.assertRaisesRegex(ValueError, "backend\\.time_quantization_violation"):
             backend.plan(eir)
 
     def test_cpu_sim_emulated_ops_listed(self):
-        backend = REGISTRY.load_backend("cpu-sim")
+        backend = load_backend("cpu-sim")
         eir = _minimal_eir(profile="BASE", mode="fixed_step", dt_us=100)
         # Replace node op with unsupported to force emulation
         eir["nodes"][0]["op"] = "unknown_op_xyz"
@@ -78,7 +66,7 @@ class TestPlanners(unittest.TestCase):
         self.assertGreaterEqual(ops.get("emulated_count", 0), 1)
 
     def test_gpu_sim_fixed_step_dt_in_plan(self):
-        backend = REGISTRY.load_backend("gpu-sim")
+        backend = load_backend("gpu-sim")
         eir = _minimal_eir(profile="BASE", mode="fixed_step", dt_us=100)
         plan = backend.plan(eir)
         sched = plan.get("schedule", [])
@@ -86,7 +74,7 @@ class TestPlanners(unittest.TestCase):
         self.assertEqual(sched[0].get("dt_us"), 100)
 
     def test_gpu_sim_exact_event_epsilon_violation(self):
-        backend = REGISTRY.load_backend("gpu-sim")
+        backend = load_backend("gpu-sim")
         eir = _minimal_eir(profile="BASE", mode="exact_event", eps_time_us=0)
         with self.assertRaisesRegex(ValueError, "backend\\.time_quantization_violation"):
             backend.plan(eir)

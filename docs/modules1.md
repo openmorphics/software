@@ -62,7 +62,7 @@ Wellness and creative
   - EIR: [EIRGraph](eventflow-core/eventflow_core/eir/graph.py:1)
   - Ops used widely: EventFuse, DelayLine, XYToChannel, ShiftXY, STFT, MelBands, LIFNeuron (all in [ops.py](eventflow-core/eventflow_core/eir/ops.py:1))
 - Execution is typically done with [run_event_mode()](eventflow-core/eventflow_core/runtime/exec.py:7) in tests.
-- SAL integration is indirect: SAL produces Event Tensor JSONL traces (via [stream_to_jsonl()](eventflow-sal/api.py:195)), then CLI run merges module EIR with traces. There are no direct SAL bindings in modules, which is appropriate (keep domain graphs backend-agnostic).
+- SAL integration is indirect: SAL produces Event Tensor JSONL traces (via [stream_to_jsonl()](eventflow-sal/eventflow_sal/stream.py:204)), then CLI run merges module EIR with traces. There are no direct SAL bindings in modules, which is appropriate (keep domain graphs backend-agnostic).
 
 4) Test coverage and documentation quality
 
@@ -84,7 +84,7 @@ Cross-cutting (apply to all modules in this package)
 - Ensure each function uses or clearly documents its “source” argument; alternatively remove unused inputs from signatures and document runtime wiring conventions.
 - Standardize node names and ports (“in”, “out”, “a”, “b”, “spec”, “mel”, “ch”) and document them.
 - Add unit-checked metadata to graphs where applicable (e.g., value units).
-- Provide golden traces for reference inputs for each module; add compare-traces tests using [compare_traces_jsonl()](eventflow-core/conformance/comparator.py:60).
+- Provide golden traces for reference inputs for each module; add compare-traces tests using [compare_traces_jsonl()](eventflow-core/eventflow_core/conformance/comparator.py:60).
 - Add edge-case tests (empty streams, high-rate overload, extreme window sizes); add property-based tests for ordering invariants.
 
 Module-specific
@@ -195,7 +195,7 @@ Module-specific
   - Audio: [sine_pcm()](eventflow-modules/tests/test_audio_modules.py:6)
   - Vision: [dvs_stream_east()](eventflow-modules/tests/test_domain_modules.py:11), [dvs_single()](eventflow-modules/tests/test_domain_modules.py:19)
   - Generic: [impulses()](eventflow-modules/tests/test_domain_modules.py:23)
-- Golden traces per module and conformance checks using [compare_traces_jsonl()](eventflow-core/conformance/comparator.py:60)
+- Golden traces per module and conformance checks using [compare_traces_jsonl()](eventflow-core/eventflow_core/conformance/comparator.py:60)
 - Negative/pathological cases: zero events, burst rates, mismatched window/delay, extremely large/small params, long durations.
 - Determinism: run twice with same seed and inputs; bit-exact trace equality.
 

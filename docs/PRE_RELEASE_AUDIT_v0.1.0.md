@@ -40,7 +40,7 @@ Updated docs and READMEs reflect:
 - SAL timestamp handling: drift/jitter stats and dt percentiles; JSONL passthrough normalization:
   - [docs/SAL.md](docs/SAL.md)
   - [eventflow-sal/README.md](eventflow-sal/README.md)
-  - High‑level SAL function: [stream_to_jsonl()](eventflow-sal/api.py:171)
+  - High‑level SAL function: [stream_to_jsonl()](eventflow-sal/eventflow_sal/stream.py:204)
 - Backend registry and execution planning behaviors:
   - [docs/BACKENDS.md](docs/BACKENDS.md)
 - Deterministic modes and conformance:
@@ -51,7 +51,7 @@ Updated docs and READMEs reflect:
   - [docs/README.md](docs/README.md)
 
 Public API docstrings status (spot‑check):
-- SAL: [stream_to_jsonl()](eventflow-sal/api.py:171) includes detailed docstring and parameters.
+- SAL: [stream_to_jsonl()](eventflow-sal/eventflow_sal/stream.py:204) includes detailed docstring and parameters.
 - Core runtime: [run_event_mode()](eventflow-core/eventflow_core/runtime/exec.py:1) and [run_fixed_dt()](eventflow-core/eventflow_core/runtime/exec.py:25) include docstrings in the synchronized draft; tests exercise semantics.
 - CLI ef subcommands primarily documented in [docs/CLI.md](docs/CLI.md); inline function docstrings are planned to be added to ef subcommand handlers in a subsequent patch (v0.1.1) without breaking interfaces.
 
@@ -68,6 +68,13 @@ New/updated tests:
 - CLI JSON smoke tests:
   - [eventflow-cli/tests/test_ef_cli_json.py](eventflow-cli/tests/test_ef_cli_json.py)
   - [eventflow-cli/tests/test_ef_cli_sal_and_run.py](eventflow-cli/tests/test_ef_cli_sal_and_run.py)
+- End-to-end integration suites:
+  - [tests/integration/test_e2e_vision.py](tests/integration/test_e2e_vision.py)
+  - [tests/integration/test_e2e_audio.py](tests/integration/test_e2e_audio.py)
+  - [tests/integration/test_e2e_imu.py](tests/integration/test_e2e_imu.py)
+  - [tests/integration/test_e2e_error_contracts.py](tests/integration/test_e2e_error_contracts.py)
+- Conformance CLI contracts:
+  - [tests/conformance/test_compare_traces_contracts.py](tests/conformance/test_compare_traces_contracts.py)
 - SAL normalization and telemetry:
   - [eventflow-sal/tests/test_stream_jsonl.py](eventflow-sal/tests/test_stream_jsonl.py)
 - Core schedulers determinism:
@@ -117,7 +124,7 @@ Interoperability validation:
 - Resource behavior:
   - SAL paths close files promptly; run pipelines write outputs under specified paths.
 - Cross‑platform:
-  - Development and tests target macOS/Linux + Python 3.9+; Windows via WSL recommended.
+  - Fast CI gate runs on Linux/macOS/Windows with required checks.
 
 Performance notes:
 - gpu‑sim provides deterministic trace emission analogous to cpu‑sim; performance characteristics to be improved in minor versions.
@@ -147,11 +154,11 @@ Highlights
 - Deterministic runtime
   - exact_event and fixed_step schedulers with tests: [test_scheduler_modes.py](eventflow-core/tests/test_scheduler_modes.py)
 - SAL
-  - JSONL passthrough normalization with header enforcement: [stream_to_jsonl()](eventflow-sal/api.py:171)
+  - JSONL passthrough normalization with header enforcement: [stream_to_jsonl()](eventflow-sal/eventflow_sal/stream.py:204)
   - Drift/jitter estimation and dt percentiles in telemetry
   - Defensive registry errors; file/device URI handling: [registry.py](eventflow-sal/eventflow_sal/registry.py)
 - Backends
-  - cpu‑sim/gpu‑sim planning and deterministic trace emission: [executor.py (cpu)](eventflow-backends/cpu_sim/executor.py:1), [executor.py (gpu)](eventflow-backends/gpu_sim/executor.py:1)
+  - cpu‑sim/gpu‑sim planning and deterministic trace emission: [executor.py (cpu)](eventflow-backends/eventflow_backends/cpu_sim/executor.py:1), [executor.py (gpu)](eventflow-backends/eventflow_backends/gpu_sim/executor.py:1)
 - CLI
   - JSON output mode for version, list‑backends, sal‑stream, compare‑traces, package: [ef.py](eventflow-cli/ef.py)
   - New profiling stats for Event Tensor JSONL
@@ -196,7 +203,7 @@ Known issues
 ### Deployment Checklist
 
 - Schema validation
-  - [ ] EIR JSON validates: ef validate-eir --path model.eir.json
+  - [ ] EIR JSON validates: ef validate --eir model.eir.json
   - [ ] Inputs validate (Event Tensor JSON/JSONL)
   - [ ] DCD validates for target backends
 
@@ -222,8 +229,9 @@ Known issues
   - [ ] Inputs validated with schema and bounds
 
 - CI/CD
-  - [ ] Unit/integration tests pass with coverage gate
-  - [ ] CLI JSON outputs consumed by CI for artifacts/metrics
+  - [ ] Required checks pass: `ci-fast (linux)`, `ci-fast (macos)`, `ci-fast (windows)`
+  - [ ] Manual heavy workflows available and reproducible: `bench.yml`, `native-gates.yml`
+  - [ ] Wheel builds run only in manual/release contexts via `wheels.yml`
 
 
 ### Troubleshooting Guide (Summary)
@@ -252,11 +260,11 @@ Known issues
   - [run_event_mode()](eventflow-core/eventflow_core/runtime/exec.py:1)
   - [run_fixed_dt()](eventflow-core/eventflow_core/runtime/exec.py:25)
 - SAL normalization/telemetry:
-  - [stream_to_jsonl()](eventflow-sal/api.py:171)
+  - [stream_to_jsonl()](eventflow-sal/eventflow_sal/stream.py:204)
   - [resolve_source()](eventflow-sal/eventflow_sal/registry.py:14)
 - Simulators:
-  - [cpu-sim executor](eventflow-backends/cpu_sim/executor.py:1)
-  - [gpu-sim executor](eventflow-backends/gpu_sim/executor.py:1)
+  - [cpu-sim executor](eventflow-backends/eventflow_backends/cpu_sim/executor.py:1)
+  - [gpu-sim executor](eventflow-backends/eventflow_backends/gpu_sim/executor.py:1)
 - CLI:
   - [ef CLI](eventflow-cli/ef.py)
   - Tests: [test_ef_cli_json.py](eventflow-cli/tests/test_ef_cli_json.py), [test_ef_cli_sal_and_run.py](eventflow-cli/tests/test_ef_cli_sal_and_run.py)

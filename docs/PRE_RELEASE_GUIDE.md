@@ -40,14 +40,14 @@ Quick verification
 
 eventflow-core
 - Public entry points:
-  - [version()](eventflow-core/__init__.py:41)
-  - [compile_and_run()](eventflow-core/__init__.py:144)
+  - [version()](eventflow-core/eventflow_core/runtime_api.py:41)
+  - [compile_and_run()](eventflow-core/eventflow_core/runtime_api.py:144)
 - Runtime execution helpers:
   - [run_event_mode()](eventflow-core/eventflow_core/runtime/exec.py:7)
   - [run_fixed_dt()](eventflow-core/eventflow_core/runtime/exec.py:29)
 - Conformance utilities:
   - [trace_equivalent()](eventflow-core/eventflow_core/conformance/compare.py:2)
-  - [compare_traces_jsonl()](eventflow-core/conformance/comparator.py:60), [print_report()](eventflow-core/conformance/comparator.py:143)
+  - [compare_traces_jsonl()](eventflow-core/eventflow_core/conformance/comparator.py:60), [print_report()](eventflow-core/eventflow_core/conformance/comparator.py:143)
 - Example imports:
   - from eventflow_core import version, compile_and_run
   - from eventflow_core.runtime.exec import run_event_mode, run_fixed_dt
@@ -55,7 +55,7 @@ eventflow-core
 
 eventflow-sal
 - Public entry points:
-  - [stream_to_jsonl()](eventflow-sal/api.py:195)
+  - [stream_to_jsonl()](eventflow-sal/eventflow_sal/stream.py:195)
   - [EventPacket](eventflow-sal/eventflow_sal/api/packet.py:8), [dvs_event()](eventflow-sal/eventflow_sal/api/packet.py:13), [audio_band_event()](eventflow-sal/eventflow_sal/api/packet.py:14), [imu_axis_event()](eventflow-sal/eventflow_sal/api/packet.py:15)
   - [BaseSource](eventflow-sal/eventflow_sal/api/source.py:6), [Replayable](eventflow-sal/eventflow_sal/api/source.py:32), [BaseSource.seek()](eventflow-sal/eventflow_sal/api/source.py:20)
   - [parse_sensor_uri()](eventflow-sal/eventflow_sal/api/uri.py:7), [SensorURI](eventflow-sal/eventflow_sal/api/uri.py:5)
@@ -71,11 +71,11 @@ eventflow-sal
 
 eventflow-backends
 - Registry (authoritative):
-  - [list_backends()](eventflow-backends/registry/registry.py:154), [load_backend()](eventflow-backends/registry/registry.py:158)
+  - [list_backends()](eventflow-backends/eventflow_backends/registry.py:154), [load_backend()](eventflow-backends/eventflow_backends/registry.py:158)
 - Mini-registry (compatibility):
   - [get_backend()](eventflow-backends/eventflow_backends/__init__.py:20)
 - CPU simulator executor:
-  - [plan_cpu_sim()](eventflow-backends/cpu_sim/executor.py:44), [run_cpu_sim()](eventflow-backends/cpu_sim/executor.py:188)
+  - [plan_cpu_sim()](eventflow-backends/eventflow_backends/cpu_sim/executor.py:44), [run_cpu_sim()](eventflow-backends/eventflow_backends/cpu_sim/executor.py:188)
 - Example imports:
   - from eventflow_backends.registry.registry import list_backends, load_backend
   - from eventflow_backends import get_backend
@@ -83,9 +83,9 @@ eventflow-backends
 eventflow-cli
 - Console script: eventflow -> [main()](eventflow-cli/eventflow_cli/main.py:31)
 - CLI subcommands:
-  - SAL streaming: [cmd_sal_stream()](eventflow-cli/ef.py:265)
-  - Backends: [cmd_list_backends()](eventflow-cli/ef.py:177), [cmd_build()](eventflow-cli/ef.py:505), [cmd_run()](eventflow-cli/ef.py:536)
-  - Conformance: [cmd_compare_traces()](eventflow-cli/ef.py:572)
+  - SAL streaming: [cmd_sal_stream()](eventflow-cli/eventflow_cli/main.py:265)
+  - Backends: [cmd_list_backends()](eventflow-cli/eventflow_cli/main.py:177), [cmd_build()](eventflow-cli/eventflow_cli/main.py:505), [cmd_run()](eventflow-cli/eventflow_cli/main.py:536)
+  - Conformance: [cmd_compare_traces()](eventflow-cli/eventflow_cli/main.py:572)
 
 eventflow-modules
 - Namespaced imports: from eventflow_modules import audio, vision, robotics, timeseries, wellness, creative
@@ -108,12 +108,12 @@ CalibrationStage (abstract) -> DeadPixelMask | PolarityBalance
 Core runtime relationships
 
 EIRGraph -> executed by [run_event_mode()](eventflow-core/eventflow_core/runtime/exec.py:7) or [run_fixed_dt()](eventflow-core/eventflow_core/runtime/exec.py:29)
-Comparator: [trace_equivalent()](eventflow-core/eventflow_core/conformance/compare.py:2) (in-memory) vs [compare_traces_jsonl()](eventflow-core/conformance/comparator.py:60) (file-based)
+Comparator: [trace_equivalent()](eventflow-core/eventflow_core/conformance/compare.py:2) (in-memory) vs [compare_traces_jsonl()](eventflow-core/eventflow_core/conformance/comparator.py:60) (file-based)
 
 Backends relationships
 
-Registry: [list_backends()](eventflow-backends/registry/registry.py:154) / [load_backend()](eventflow-backends/registry/registry.py:158) -> CpuSimBackend/GpuSimBackend
-CpuSimBackend -> [plan_cpu_sim()](eventflow-backends/cpu_sim/executor.py:44) -> [run_cpu_sim()](eventflow-backends/cpu_sim/executor.py:188)
+Registry: [list_backends()](eventflow-backends/eventflow_backends/registry.py:154) / [load_backend()](eventflow-backends/eventflow_backends/registry.py:158) -> CpuSimBackend/GpuSimBackend
+CpuSimBackend -> [plan_cpu_sim()](eventflow-backends/eventflow_backends/cpu_sim/executor.py:44) -> [run_cpu_sim()](eventflow-backends/eventflow_backends/cpu_sim/executor.py:188)
 
 4. Migration guide (from stub-based to re-exported APIs)
 
@@ -126,10 +126,10 @@ Import mapping
 - Old: from eventflow-sal/sync import ClockSync -> New: from eventflow_sal.sync import ClockSync
 - Old: from eventflow-sal/drivers/dvs import DVSSource -> New: from eventflow_sal.drivers import DVSSource
 - Old: from eventflow-backends/gpu_sim import ... -> New: from eventflow_backends.registry.registry import load_backend
-- Old: direct open() on JSONL -> New: use [stream_to_jsonl()](eventflow-sal/api.py:195) pass-through normalization
+- Old: direct open() on JSONL -> New: use [stream_to_jsonl()](eventflow-sal/eventflow_sal/stream.py:195) pass-through normalization
 
 Behavior notes
-- SAL JSONL header time unit is microseconds; event timestamps emitted as microseconds in records by [_write_event()](eventflow-sal/api.py:60)
+- SAL JSONL header time unit is microseconds; event timestamps emitted as microseconds in records by [_write_event()](eventflow-sal/eventflow_sal/stream.py:60)
 - BaseSource.seek() remains optional (raises NotImplementedError by default) in [BaseSource.seek()](eventflow-sal/eventflow_sal/api/source.py:20)
 
 5. Module interdependencies and recommended import patterns
@@ -145,7 +145,7 @@ Recommended patterns
   - Use eventflow_sal.* (never eventflow-sal/* file paths)
   - Use eventflow_backends.registry.registry for runtime backend selection
   - Use eventflow_core.runtime.exec helpers rather than reimplementing execution
-- Keep CLI-only dynamic loaders contained within [ef.py](eventflow-cli/ef.py:39)
+- Keep CLI-only dynamic loaders contained within [ef.py](eventflow-cli/eventflow_cli/main.py:39)
 
 6. Code examples
 
@@ -200,24 +200,24 @@ ModuleNotFoundError for eventflow_* packages
 - Ensure venv is active and either pip install -e ... was run, or PYTHONPATH includes all six module roots (see Section 1).
 
 Unknown backend 'X'
-- Verify name in [list_backends()](eventflow-backends/registry/registry.py:154). For simulators, use "cpu-sim" or "gpu-sim".
+- Verify name in [list_backends()](eventflow-backends/eventflow_backends/registry.py:154). For simulators, use "cpu-sim" or "gpu-sim".
 
 SAL JSONL “open()” errors
-- JSONL normalization must use [stream_to_jsonl()](eventflow-sal/api.py:195) (registry intentionally rejects JSONL in [resolve_source()](eventflow-sal/eventflow_sal/registry.py:33)).
+- JSONL normalization must use [stream_to_jsonl()](eventflow-sal/eventflow_sal/stream.py:195) (registry intentionally rejects JSONL in [resolve_source()](eventflow-sal/eventflow_sal/registry.py:33)).
 
 Time units mismatch
-- SAL writes microsecond timestamps in records (see [_write_event()](eventflow-sal/api.py:60)); ensure downstream tools expect microseconds.
+- SAL writes microsecond timestamps in records (see [_write_event()](eventflow-sal/eventflow_sal/stream.py:60)); ensure downstream tools expect microseconds.
 
 CLI not found
-- If installed: run "eventflow". In repo-only usage: "python -u eventflow-cli/ef.py".
+- If installed: run "eventflow". In repo-only usage: "python -u eventflow-cli/eventflow_cli/main.py".
 
 8. Packaging and API stability
 
 Public/stable APIs for v0.1.0
-- Core: [version()](eventflow-core/__init__.py:41), [compile_and_run()](eventflow-core/__init__.py:144), [run_event_mode()](eventflow-core/eventflow_core/runtime/exec.py:7), [run_fixed_dt()](eventflow-core/eventflow_core/runtime/exec.py:29), [trace_equivalent()](eventflow-core/eventflow_core/conformance/compare.py:2)
-- SAL: [stream_to_jsonl()](eventflow-sal/api.py:195), [EventPacket](eventflow-sal/eventflow_sal/api/packet.py:8) and constructors, [BaseSource](eventflow-sal/eventflow_sal/api/source.py:6), [parse_sensor_uri()](eventflow-sal/eventflow_sal/api/uri.py:7), [ClockSync](eventflow-sal/eventflow_sal/sync/clock.py:10)
-- Backends: [list_backends()](eventflow-backends/registry/registry.py:154), [load_backend()](eventflow-backends/registry/registry.py:158), [get_backend()](eventflow-backends/eventflow_backends/__init__.py:20), [plan_cpu_sim()](eventflow-backends/cpu_sim/executor.py:44), [run_cpu_sim()](eventflow-backends/cpu_sim/executor.py:188)
-- CLI: [cmd_sal_stream()](eventflow-cli/ef.py:265), [cmd_build()](eventflow-cli/ef.py:505), [cmd_run()](eventflow-cli/ef.py:536), [cmd_compare_traces()](eventflow-cli/ef.py:572)
+- Core: [version()](eventflow-core/eventflow_core/runtime_api.py:41), [compile_and_run()](eventflow-core/eventflow_core/runtime_api.py:144), [run_event_mode()](eventflow-core/eventflow_core/runtime/exec.py:7), [run_fixed_dt()](eventflow-core/eventflow_core/runtime/exec.py:29), [trace_equivalent()](eventflow-core/eventflow_core/conformance/compare.py:2)
+- SAL: [stream_to_jsonl()](eventflow-sal/eventflow_sal/stream.py:195), [EventPacket](eventflow-sal/eventflow_sal/api/packet.py:8) and constructors, [BaseSource](eventflow-sal/eventflow_sal/api/source.py:6), [parse_sensor_uri()](eventflow-sal/eventflow_sal/api/uri.py:7), [ClockSync](eventflow-sal/eventflow_sal/sync/clock.py:10)
+- Backends: [list_backends()](eventflow-backends/eventflow_backends/registry.py:154), [load_backend()](eventflow-backends/eventflow_backends/registry.py:158), [get_backend()](eventflow-backends/eventflow_backends/__init__.py:20), [plan_cpu_sim()](eventflow-backends/eventflow_backends/cpu_sim/executor.py:44), [run_cpu_sim()](eventflow-backends/eventflow_backends/cpu_sim/executor.py:188)
+- CLI: [cmd_sal_stream()](eventflow-cli/eventflow_cli/main.py:265), [cmd_build()](eventflow-cli/eventflow_cli/main.py:505), [cmd_run()](eventflow-cli/eventflow_cli/main.py:536), [cmd_compare_traces()](eventflow-cli/eventflow_cli/main.py:572)
 - Hub: [HubClient](eventflow-hub/eventflow_hub/client.py:6)
 
 Semantic versioning and compatibility
@@ -239,10 +239,23 @@ ef compare-traces --golden examples/vision_optical_flow/traces/golden/vision.gol
 Test matrix (repo-local)
 
 export PYTHONPATH="eventflow-core:eventflow-sal:eventflow-backends:eventflow-cli:eventflow-modules:eventflow-hub:${PYTHONPATH:-}"
-python3 -m unittest discover -s eventflow-sal/tests -v
-python3 -m unittest discover -s eventflow-core/tests -v
-python3 -m unittest discover -s eventflow-backends/tests -v
-python3 -m unittest discover -s eventflow-cli/tests -v
-python3 -m unittest discover -s eventflow-modules/tests -v
+python3 -m pytest -q -rs
+python3 -m pytest -q tests/integration -rs
+python3 -m pytest -q tests/conformance -rs
+
+Manual native/perf validation (heavy gates)
+
+python3 -m pip install -U maturin
+(cd eventflow-core && python3 -m maturin develop -r)
+(cd eventflow-modules && python3 -m maturin develop -r)
+EF_NATIVE=1 python3 -m pytest -q eventflow-core/tests/test_native_parity.py
+EF_NATIVE=1 EF_BENCH_GATE=1 CORE_BUCKET_MIN=1.5 CORE_FUSE_MIN=1.5 python3 -m pytest -q eventflow-core/tests/test_bench_gate_speedups.py
+EF_NATIVE=1 EF_BENCH_GATE=1 MOD_PASS_MIN=1.3 MOD_FUSE_MIN=1.5 python3 -m pytest -q eventflow-modules/tests/test_bench_gate_speedups.py
+
+CI workflow policy
+
+- Required fast PR checks: `ci-fast (linux)`, `ci-fast (macos)`, `ci-fast (windows)`
+- Manual heavy workflows: `bench.yml`, `native-gates.yml`
+- Wheel builds: manual or release context via `wheels.yml`
 
 End of document.

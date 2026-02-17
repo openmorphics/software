@@ -10,7 +10,7 @@ References
 - Event Tensor schema (JSONL): [event_tensor.schema.md](eventflow-core/docs/specs/event_tensor.schema.md:1) or [event_tensor.schema.md](docs/specs/event_tensor.schema.md:1)
 - EIR schema: [eir.schema.md](docs/specs/eir.schema.md:1)
 - SAL watermarks: [eventflow_sal.sync.watermark](../../eventflow-sal/eventflow_sal/sync/watermark.py:1)
-- Conformance comparator: [compare_traces_jsonl()](../../eventflow-core/conformance/comparator.py:1)
+- Conformance comparator: [compare_traces_jsonl()](../../eventflow-core/eventflow_core/conformance/comparator.py:1)
 - Runtime exact-event executor: [run_event_mode()](../../eventflow-core/eventflow_core/runtime/exec.py:7)
 
 1. Overview and goals
@@ -232,7 +232,7 @@ Notes:
 - Canonical order: (TS ascending, IDX tuple lexicographic). If two records have identical (TS, IDX), the device MUST preserve program order or deterministic tiebreakers.
 - Reordering window: Within EVX_REORDER_US, the device MAY buffer inputs to enforce canonical ordering. Inputs with TS older than now−REORDER_US MUST NOT be reordered past each other; violations set LAST_ERR=epsilon_violation or ts_regress.
 - Epsilon (time): Quantization or scheduling jitter MUST remain within EPS_TIME_US. Violations MUST set an error and, depending on policy, halt or continue with a flag.
-- Replay: Given the same inputs and EVX_SEED, the OUT sequence MUST be bit-equivalent (values, timestamps, IDX), enabling [compare_traces_jsonl()](../../eventflow-core/conformance/comparator.py:1) equality.
+- Replay: Given the same inputs and EVX_SEED, the OUT sequence MUST be bit-equivalent (values, timestamps, IDX), enabling [compare_traces_jsonl()](../../eventflow-core/eventflow_core/conformance/comparator.py:1) equality.
 
 7. Initialization sequence (host)
 
@@ -300,5 +300,5 @@ Appendix A: Suggested default constants
 
 Appendix B: Cross-component alignment
 - SAL watermarks: EVX WATERMARK semantics align with SAL; see [eventflow_sal.sync.watermark](../../eventflow-sal/eventflow_sal/sync/watermark.py:1).
-- Conformance: Golden/candidate comparisons use [compare_traces_jsonl()](../../eventflow-core/conformance/comparator.py:1).
+- Conformance: Golden/candidate comparisons use [compare_traces_jsonl()](../../eventflow-core/eventflow_core/conformance/comparator.py:1).
 - Runtime: EXACT_EVENT matches [run_event_mode()](../../eventflow-core/eventflow_core/runtime/exec.py:7) semantics (modulo time quantization and device scheduling deltas within EPS_TIME_US).

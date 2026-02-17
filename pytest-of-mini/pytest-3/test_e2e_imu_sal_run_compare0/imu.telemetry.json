@@ -1,0 +1,25 @@
+{
+  "uri": "imu.6dof://file?path=/Volumes/2.5SSDDD128/bully /software/examples/robotics_slam/traces/inputs/imu_sample.csv",
+  "out": "/Volumes/2.5SSDDD128/bully /software/pytest-of-mini/pytest-3/test_e2e_imu_sal_run_compare0/imu.norm.jsonl",
+  "count": 30,
+  "ts_min_us": 0,
+  "ts_max_us": 4000,
+  "duration_us": 4000,
+  "events_per_second": 7500.0,
+  "dt": {
+    "count": 4,
+    "p50_us": 1000,
+    "p95_us": 1000,
+    "p99_us": 1000,
+    "median_us": 1000
+  },
+  "clock": {
+    "host_duration_ns": 1562750,
+    "sensor_duration_ns": 4000000,
+    "drift_ppm_est": 1559590.4655255158,
+    "jitter_p50_us": 0,
+    "jitter_p95_us": 0,
+    "jitter_p99_us": 0
+  },
+  "normalized": true
+}

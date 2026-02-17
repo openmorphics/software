@@ -1,10 +1,8 @@
 name: Build and Test Wheels
 
 on:
-  push:
-    branches: ["**"]
-  pull_request:
-    branches: ["**"]
+  release:
+    types: [published]
   workflow_dispatch:
 
 env:
@@ -131,9 +129,35 @@ jobs:
           name: wheels-windows-msvc
           path: dist/*
 
+  build-python-packages:
+    name: Build pure Python wheels (Linux)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build pure Python wheels
+        run: |
+          python -m pip install -U pip build
+          mkdir -p dist
+          for pkg in eventflow-sal eventflow-backends eventflow-cli eventflow-hub; do
+            python -m build --wheel -o dist "$pkg"
+          done
+          ls -la dist
+
+      - name: Upload artifacts (pure python)
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-pure-python
+          path: dist/*
+
   test-wheels:
     name: Install and test wheels (Linux x86_64)
-    needs: [linux-manylinux, linux-musllinux, macos-universal2, windows-msvc]
+    needs: [linux-manylinux, linux-musllinux, macos-universal2, windows-msvc, build-python-packages]
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -148,16 +172,32 @@ jobs:
           python3 -m venv .venv
           . .venv/bin/activate
           pip install -U pip
-          # Prefer manylinux wheels; fallback to local build if none found
-          WHEELS=$(find wheelhouse -type f -name "*.whl" | tr '\n' ' ' || true)
-          if [ -n "$WHEELS" ]; then
-            pip install $WHEELS
-          else
-            pip install maturin
-            maturin build -m eventflow-core/pyproject.toml -r --strip --out dist
-            maturin build -m eventflow-modules/pyproject.toml -r --strip --out dist
-            pip install dist/*.whl
-          fi
+          python - <<'PY'
+          import glob
+          import pathlib
+          import subprocess
+          import sys
+          from packaging.tags import sys_tags
+          from packaging.utils import parse_wheel_filename
+
+          wheel_paths = glob.glob("wheelhouse/**/*.whl", recursive=True)
+          if not wheel_paths:
+              raise SystemExit("no wheel artifacts found")
+
+          supported = set(sys_tags())
+          selected = []
+          for path in wheel_paths:
+              name = pathlib.Path(path).name
+              _, _, _, tags = parse_wheel_filename(name)
+              if tags & supported:
+                  selected.append(path)
+
+          if not selected:
+              raise SystemExit("no wheels compatible with this Linux test runner")
+
+          subprocess.check_call([sys.executable, "-m", "pip", "install", *selected])
+          print(f"installed {len(selected)} compatible wheels")
+          PY
           pip install -U pytest pytest-benchmark numpy
 
       - name: Run test suite (core)
@@ -169,6 +209,50 @@ jobs:
         run: |
           . .venv/bin/activate
           pytest -q eventflow-modules/tests
+
+      - name: Run installed artifact smoke tests (CLI/runtime)
+        run: |
+          . .venv/bin/activate
+          python - <<'PY'
+          import json
+          import pathlib
+          import subprocess
+
+          def run(*args: str):
+              proc = subprocess.run(["eventflow", *args], capture_output=True, text=True, check=False)
+              if proc.returncode != 0:
+                  raise SystemExit(f"command failed rc={proc.returncode}: {' '.join(args)}\nstdout={proc.stdout}\nstderr={proc.stderr}")
+              try:
+                  return json.loads(proc.stdout)
+              except Exception as exc:
+                  raise SystemExit(f"invalid JSON output for {' '.join(args)}: {exc}\nstdout={proc.stdout}") from exc
+
+          ver = run("--json", "version")
+          if "version" not in ver:
+              raise SystemExit("version payload missing 'version'")
+
+          backends = run("--json", "list-backends")
+          names = backends.get("backends", [])
+          if "cpu-sim" not in names:
+              raise SystemExit(f"cpu-sim missing from backend list: {names}")
+
+          trace_out = pathlib.Path("out/wheels_artifact_smoke.trace.jsonl")
+          trace_out.parent.mkdir(parents=True, exist_ok=True)
+          res = run(
+              "--json",
+              "run",
+              "--eir",
+              "examples/wakeword/eir.json",
+              "--backend",
+              "cpu-sim",
+              "--input",
+              "examples/wakeword/traces/inputs/audio_sample.jsonl",
+              "--trace-out",
+              str(trace_out),
+          )
+          if res.get("status") != "ok" or not trace_out.is_file():
+              raise SystemExit(f"run smoke failed: {res}")
+          PY
 
   bench-artifacts:
     name: Attach benchmark artifacts from Benchmarks workflow (PRs)

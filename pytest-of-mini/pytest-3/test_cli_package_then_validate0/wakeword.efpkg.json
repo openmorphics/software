@@ -1,0 +1,47 @@
+{
+  "schema_version": "0.1.0",
+  "sdk_version": "0.1.0",
+  "created_at": "2026-02-17T04:04:15.631589+00:00",
+  "model": {
+    "id": "pkg.wakeword.demo",
+    "name": "Wakeword Demo",
+    "version": "0.1.0",
+    "description": "coverage gate packaging test"
+  },
+  "profile": {
+    "name": "BASE"
+  },
+  "determinism": {
+    "time_unit": "us",
+    "mode": "fixed_step",
+    "epsilon_time_us": 100,
+    "epsilon_numeric": 1e-05,
+    "seed": 42,
+    "fixed_step_dt_us": 100
+  },
+  "features": [],
+  "capabilities_required": {},
+  "artifacts": {
+    "eir": {
+      "path": "../../../examples/wakeword/eir.json",
+      "format": "json",
+      "sha256": "0740717ba57c5f735b25ce0897384b2a9acbb83f4fcea8b35d26a0636642b237",
+      "filesize_bytes": 757
+    },
+    "traces": {
+      "golden": {
+        "path": "../../../examples/wakeword/traces/golden/wakeword.golden.jsonl",
+        "format": "jsonl",
+        "sha256": "a5b05b476fd69bc9e593a975cfd66afeb985533b2d5c48c4379e5f7339f1ec3d"
+      },
+      "inputs": [
+        {
+          "path": "../../../examples/wakeword/traces/inputs/audio_sample.jsonl",
+          "format": "jsonl",
+          "sha256": "3e0bec5b39f27a365e32ef26e30056489690841607df2a4e25f396cbb6f444c7"
+        }
+      ]
+    }
+  },
+  "compatibility": {}
+}

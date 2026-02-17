@@ -104,7 +104,7 @@ Executable mapping to code
   - [eventflow-sal/eventflow_sal/open.py](eventflow-sal/eventflow_sal/open.py:1)
 - Comparator and conformance:
   - [eventflow-cli/ef.py](eventflow-cli/ef.py:1) (compare-traces entrypoint and validators)
-  - Comparator module (planned): [eventflow-core/conformance/comparator.py](eventflow-core/conformance/comparator.py:1)
+  - Comparator module: [eventflow-core/eventflow_core/conformance/comparator.py](eventflow-core/eventflow_core/conformance/comparator.py:1)
 - Runtime determinism contracts (planned):
   - [eventflow-core/conformance/contracts.py](eventflow-core/conformance/contracts.py:1)
 - CLI switch/flags (planned):

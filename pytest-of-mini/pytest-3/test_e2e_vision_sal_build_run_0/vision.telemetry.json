@@ -1,0 +1,25 @@
+{
+  "path_in": "/Volumes/2.5SSDDD128/bully /software/examples/vision_optical_flow/traces/inputs/vision_sample.jsonl",
+  "path_out": "/Volumes/2.5SSDDD128/bully /software/pytest-of-mini/pytest-3/test_e2e_vision_sal_build_run_0/vision.norm.jsonl",
+  "count": 3,
+  "ts_min_us": 100,
+  "ts_max_us": 133,
+  "duration_us": 33,
+  "events_per_second": 90909.0909090909,
+  "dt": {
+    "count": 2,
+    "p50_us": 4,
+    "p95_us": 29,
+    "p99_us": 29,
+    "median_us": 29
+  },
+  "clock": {
+    "host_duration_ns": 237291,
+    "sensor_duration_ns": 33000,
+    "drift_ppm_est": -860930.2501991226,
+    "jitter_p50_us": 25,
+    "jitter_p95_us": 25,
+    "jitter_p99_us": 25
+  },
+  "normalized": true
+}

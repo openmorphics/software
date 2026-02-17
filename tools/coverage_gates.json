@@ -1,0 +1,38 @@
+{
+  "overall": {
+    "line_min": 55.0,
+    "branch_min": 38.0
+  },
+  "packages": {
+    "eventflow_core": {
+      "prefix": "eventflow-core/eventflow_core/",
+      "line_min": 77.0,
+      "branch_min": 60.0
+    },
+    "eventflow_backends": {
+      "prefix": "eventflow-backends/eventflow_backends/",
+      "line_min": 77.0,
+      "branch_min": 60.0
+    },
+    "eventflow_cli": {
+      "prefix": "eventflow-cli/eventflow_cli/",
+      "line_min": 75.0,
+      "branch_min": 50.0
+    },
+    "eventflow_sal": {
+      "prefix": "eventflow-sal/eventflow_sal/",
+      "line_min": 68.0,
+      "branch_min": 50.0
+    },
+    "eventflow_modules": {
+      "prefix": "eventflow-modules/eventflow_modules/",
+      "line_min": 42.0,
+      "branch_min": 23.0
+    },
+    "eventflow_hub": {
+      "prefix": "eventflow-hub/eventflow_hub/",
+      "line_min": 54.0,
+      "branch_min": 36.0
+    }
+  }
+}

@@ -152,13 +152,13 @@ Acceptance Criteria:
 - Types/time: [`Port`](eventflow-core/eventflow_core/eir/types.py:7), [`OpDef`](eventflow-core/eventflow_core/eir/types.py:13), [`time_to_ns()`](eventflow-core/eventflow_core/eir/types.py:20)/[`parse_time()`](eventflow-core/eventflow_core/util/units.py:10).
 - Runtime execution: [`run_event_mode()`](eventflow-core/eventflow_core/runtime/exec.py:7), [`run_fixed_dt()`](eventflow-core/eventflow_core/runtime/exec.py:29); scheduler [`build_exec_nodes()`](eventflow-core/eventflow_core/runtime/scheduler.py:18).
 - Serialization/tracing: [`save()`](eventflow-core/eventflow_core/eir/serialize.py:5), [`load()`](eventflow-core/eventflow_core/eir/serialize.py:10); trace [`record()`](eventflow-core/eventflow_core/runtime/trace.py:3), [`load()`](eventflow-core/eventflow_core/runtime/trace.py:4).
-- Validators/conformance: [`validate_eir()`](eventflow-core/validators.py:521), [`validate_event_tensor_json()`](eventflow-core/validators.py:558), [`validate_event_tensor_jsonl_path()`](eventflow-core/validators.py:583), [`validate_dcd()`](eventflow-core/validators.py:655), [`validate_efpkg()`](eventflow-core/validators.py:676), trace comparator [`trace_equivalent()`](eventflow-core/eventflow_core/conformance/compare.py:2).
+- Validators/conformance: [`validate_eir()`](eventflow-core/eventflow_core/validators.py:521), [`validate_event_tensor_json()`](eventflow-core/eventflow_core/validators.py:558), [`validate_event_tensor_jsonl_path()`](eventflow-core/eventflow_core/validators.py:583), [`validate_dcd()`](eventflow-core/eventflow_core/validators.py:655), [`validate_efpkg()`](eventflow-core/eventflow_core/validators.py:676), trace comparator [`trace_equivalent()`](eventflow-core/eventflow_core/conformance/compare.py:2).
 - Package exports: [`eventflow_core/__init__.py`](eventflow-core/eventflow_core/__init__.py), and namespace init stubs: [`eir/__init__.py`](eventflow-core/eventflow_core/eir/__init__.py), [`runtime/__init__.py`](eventflow-core/eventflow_core/runtime/__init__.py), [`compiler/__init__.py`](eventflow-core/eventflow_core/compiler/__init__.py), [`util/__init__.py`](eventflow-core/eventflow_core/util/__init__.py), [`conformance/__init__.py`](eventflow-core/eventflow_core/conformance/__init__.py), [`simulator/__init__.py`](eventflow-core/eventflow_core/simulator/__init__.py).
 
 Edge Cases and Considerations:
 - Determinism: LIF refractory handling in [`step_lif()`](eventflow-core/eventflow_core/eir/ops.py:47).
 - Missing/invalid params surface during node exec construction in [`build_exec_nodes()`](eventflow-core/eventflow_core/runtime/scheduler.py:21).
-- Version compatibility warnings in validators (e.g., [`validate_eir()`](eventflow-core/validators.py:526)).
+- Version compatibility warnings in validators (e.g., [`validate_eir()`](eventflow-core/eventflow_core/validators.py:526)).
 
 Module: eventflow-sal (Sensor Abstraction Layer)
 Title: Normalize sensor streams to Event Tensor JSONL and open device/file sources
@@ -169,9 +169,9 @@ So that models and simulators consume consistent event data.
 
 Acceptance Criteria:
 - High-level streaming API:
-  - [`stream_to_jsonl()`](eventflow-sal/api.py:192) normalizes SAL sources; parses URIs via [`parse_sensor_uri()`](eventflow-sal/eventflow_sal/api/uri.py:7); writes header via [`_write_header()`](eventflow-sal/api.py:45) and events via [`_write_event()`](eventflow-sal/api.py:57); pass-through handled by [`_normalize_existing_jsonl()`](eventflow-sal/api.py:85).
+  - [`stream_to_jsonl()`](eventflow-sal/eventflow_sal/stream.py:192) normalizes SAL sources; parses URIs via [`parse_sensor_uri()`](eventflow-sal/eventflow_sal/api/uri.py:7); writes header via [`_write_header()`](eventflow-sal/eventflow_sal/stream.py:45) and events via [`_write_event()`](eventflow-sal/eventflow_sal/stream.py:57); pass-through handled by [`_normalize_existing_jsonl()`](eventflow-sal/eventflow_sal/stream.py:85).
 - Opening sources:
-  - Wrapper [`open()`](eventflow-sal/__init__.py:13) delegates to [`open()`](eventflow-sal/eventflow_sal/open.py:5) which resolves via registry [`resolve_source()`](eventflow-sal/eventflow_sal/registry.py:19) and path resolution [`_effective_path()`](eventflow-sal/eventflow_sal/registry.py:10).
+  - Package export [`open()`](eventflow-sal/eventflow_sal/__init__.py:6) delegates to [`open()`](eventflow-sal/eventflow_sal/open.py:5) which resolves via registry [`resolve_source()`](eventflow-sal/eventflow_sal/registry.py:19) and path resolution [`_effective_path()`](eventflow-sal/eventflow_sal/registry.py:10).
 - Drivers:
   - Audio: [`MicSource`](eventflow-sal/eventflow_sal/drivers/audio.py:6) (live unimplemented), [`WAVFileSource`](eventflow-sal/eventflow_sal/drivers/audio.py:13) emits bands via [`audio_band_event()`](eventflow-sal/eventflow_sal/api/packet.py:14).
   - Vision/DVS: [`DVSSource`](eventflow-sal/eventflow_sal/drivers/dvs.py:6) (live unimplemented), [`AEDAT4FileSource`](eventflow-sal/eventflow_sal/drivers/dvs.py:13) emits via [`dvs_event()`](eventflow-sal/eventflow_sal/api/packet.py:13) with clock correction [`ClockSync.correct_ns()`](eventflow-sal/eventflow_sal/sync/clock.py:18).
@@ -187,9 +187,9 @@ Acceptance Criteria:
 
 Edge Cases and Considerations:
 - Unsupported live devices raise explicitly in [`MicSource.subscribe()`](eventflow-sal/eventflow_sal/drivers/audio.py:11), [`DVSSource.subscribe()`](eventflow-sal/eventflow_sal/drivers/dvs.py:11), [`IMUSource.subscribe()`](eventflow-sal/eventflow_sal/drivers/imu.py:10).
-- Registry rejects JSONL in [`resolve_source()`](eventflow-sal/eventflow_sal/registry.py:33); use [`stream_to_jsonl()`](eventflow-sal/api.py:192).
-- Wrapper [`read()`](eventflow-sal/__init__.py:19) validates presence of `subscribe()`.
-- Integration: CLI [`cmd_sal_stream()`](eventflow-cli/ef.py:263) invokes SAL [`stream_to_jsonl()`](eventflow-sal/api.py:192).
+- Registry rejects JSONL in [`resolve_source()`](eventflow-sal/eventflow_sal/registry.py:33); use [`stream_to_jsonl()`](eventflow-sal/eventflow_sal/stream.py:192).
+- Package exports keep lazy loading for [`open()`](eventflow-sal/eventflow_sal/__init__.py:6) and [`stream_to_jsonl()`](eventflow-sal/eventflow_sal/__init__.py:11).
+- Integration: CLI [`cmd_sal_stream()`](eventflow-cli/eventflow_cli/main.py:263) invokes SAL [`stream_to_jsonl()`](eventflow-sal/eventflow_sal/stream.py:192).
 
 Module: eventflow-backends (registry, CPU/GPU simulators)
 Title: Plan and execute EIR graphs on simulated backends with deterministic traces
@@ -200,25 +200,21 @@ So that I can generate golden traces and validate models.
 
 Acceptance Criteria:
 - Backend discovery/facades:
-  - [`list_backends()`](eventflow-backends/__init__.py:10), [`get_backend()`](eventflow-backends/__init__.py:18).
-  - In-process mini-registry [`get_backend()`](eventflow-backends/eventflow_backends/__init__.py:20).
-  - Dynamic registry: [`list_backends()`](eventflow-backends/registry/registry.py:151), [`load_backend()`](eventflow-backends/registry/registry.py:155).
+  - Canonical package API: [`list_backends()`](eventflow-backends/eventflow_backends/__init__.py:3), [`load_backend()`](eventflow-backends/eventflow_backends/__init__.py:3), [`get_backend()`](eventflow-backends/eventflow_backends/__init__.py:3).
+  - Dynamic registry: [`list_backends()`](eventflow-backends/eventflow_backends/registry.py:86), [`load_backend()`](eventflow-backends/eventflow_backends/registry.py:126).
 - Backend interface:
   - [`DeviceCapabilityDescriptor`](eventflow-backends/eventflow_backends/api.py:8), [`Backend`](eventflow-backends/eventflow_backends/api.py:17) with [`compile()`](eventflow-backends/eventflow_backends/api.py:25)/[`run_graph()`](eventflow-backends/eventflow_backends/api.py:28).
-- CPU-sim (in-process) backend:
-  - [`CPUSimBackend`](eventflow-backends/eventflow_backends/cpu_sim/backend.py:15) compiles via [`compile()`](eventflow-backends/eventflow_backends/cpu_sim/backend.py:22) and executes graphs by delegating to core [`run_event_mode()`](eventflow-core/eventflow_core/runtime/exec.py:7) in [`run_graph()`](eventflow-backends/eventflow_backends/cpu_sim/backend.py:25).
 - Registry CPU/GPU simulators:
-  - CPU: [`plan_cpu_sim()`](eventflow-backends/cpu_sim/executor.py:44), [`run_cpu_sim()`](eventflow-backends/cpu_sim/executor.py:188).
-  - GPU: [`plan_gpu_sim()`](eventflow-backends/gpu_sim/executor.py:42), [`run_gpu_sim()`](eventflow-backends/gpu_sim/executor.py:183).
-  - DCD load in constructors: [`CpuSimBackend`](eventflow-backends/registry/registry.py:56), [`GpuSimBackend`](eventflow-backends/registry/registry.py:105).
+  - CPU: [`plan_cpu_sim()`](eventflow-backends/eventflow_backends/cpu_sim/executor.py:42), [`run_cpu_sim()`](eventflow-backends/eventflow_backends/cpu_sim/executor.py:193), wrapped by [`CpuSimBackend`](eventflow-backends/eventflow_backends/registry.py:24).
+  - GPU: [`plan_gpu_sim()`](eventflow-backends/eventflow_backends/gpu_sim/executor.py:38), [`run_gpu_sim()`](eventflow-backends/eventflow_backends/gpu_sim/executor.py:192), wrapped by [`GpuSimBackend`](eventflow-backends/eventflow_backends/registry.py:55).
 - Integration with CLI:
-  - Planning via [`cmd_build()`](eventflow-cli/ef.py:503) and run via [`cmd_run()`](eventflow-cli/ef.py:534) using registry [`load_backend()`](eventflow-backends/registry/registry.py:155).
+  - Planning via [`cmd_build()`](eventflow-cli/eventflow_cli/main.py:365) and run via [`cmd_run()`](eventflow-cli/eventflow_cli/main.py:402) using registry [`load_backend()`](eventflow-backends/eventflow_backends/registry.py:126).
 
 Edge Cases and Considerations:
-- Missing DCD files raise in registry constructors (e.g., [`cpu-sim`](eventflow-backends/registry/registry.py:60)).
-- EIR validation errors fail planning early in [`plan()`](eventflow-backends/registry/registry.py:80/129).
-- Unknown backend names raise in [`get_backend()`](eventflow-backends/__init__.py:35) and [`load_backend()`](eventflow-backends/registry/registry.py:160).
-- Backend registry provides in-process simulators; top-level stub __init__.py files have been removed. See [`eventflow_backends/__init__.py`](eventflow-backends/eventflow_backends/__init__.py:15) and dynamic registry [`list_backends()`](eventflow-backends/registry/registry.py:154), [`load_backend()`](eventflow-backends/registry/registry.py:158).
+- Missing DCD files raise in registry constructors (e.g., [`cpu-sim`](eventflow-backends/eventflow_backends/registry.py:60)).
+- EIR validation errors fail planning early in [`plan()`](eventflow-backends/eventflow_backends/registry.py:80/129).
+- Unknown backend names raise in [`load_backend()`](eventflow-backends/eventflow_backends/registry.py:126) and compat [`get_backend()`](eventflow-backends/eventflow_backends/registry.py:166).
+- Backend registry provides package-local simulators via [`eventflow_backends/__init__.py`](eventflow-backends/eventflow_backends/__init__.py:3) and dynamic registry [`list_backends()`](eventflow-backends/eventflow_backends/registry.py:86), [`load_backend()`](eventflow-backends/eventflow_backends/registry.py:126).
 
 Module: eventflow-hub (Local packaging and registry)
 Title: Package and manage model artifacts locally (hub stubs)
@@ -252,27 +248,19 @@ So that I can manage the full lifecycle from data to golden traces.
 
 Acceptance Criteria (ef.py):
 - Version/registry:
-  - [`cmd_version()`](eventflow-cli/ef.py:168), [`cmd_list_backends()`](eventflow-cli/ef.py:175).
+  - [`cmd_version()`](eventflow-cli/eventflow_cli/main.py:45), [`cmd_list_backends()`](eventflow-cli/eventflow_cli/main.py:53).
 - Validators:
-  - [`cmd_validate_eir()`](eventflow-cli/ef.py:192), [`cmd_validate_event()`](eventflow-cli/ef.py:204), [`cmd_validate_dcd()`](eventflow-cli/ef.py:225), [`cmd_validate_efpkg()`](eventflow-cli/ef.py:237), [`cmd_validate_trace()`](eventflow-cli/ef.py:253).
+  - Grouped validator command [`cmd_validate()`](eventflow-cli/eventflow_cli/main.py:67) with `--eir|--event|--trace|--dcd|--efpkg`.
 - SAL streaming:
-  - [`cmd_sal_stream()`](eventflow-cli/ef.py:263) → SAL [`stream_to_jsonl()`](eventflow-sal/api.py:192).
+  - [`cmd_sal_stream()`](eventflow-cli/eventflow_cli/main.py:122) → SAL [`stream_to_jsonl()`](eventflow-sal/eventflow_sal/stream.py:204).
 - Profiling and packaging:
-  - [`cmd_profile()`](eventflow-cli/ef.py:288), [`cmd_package()`](eventflow-cli/ef.py:402).
+  - [`cmd_profile()`](eventflow-cli/eventflow_cli/main.py:160), [`cmd_package()`](eventflow-cli/eventflow_cli/main.py:264).
 - Planning and execution:
-  - [`cmd_build()`](eventflow-cli/ef.py:503), [`cmd_run()`](eventflow-cli/ef.py:534).
+  - [`cmd_build()`](eventflow-cli/eventflow_cli/main.py:365), [`cmd_run()`](eventflow-cli/eventflow_cli/main.py:402).
 - Compare traces:
-  - [`cmd_compare_traces()`](eventflow-cli/ef.py:570).
+  - [`cmd_compare_traces()`](eventflow-cli/eventflow_cli/main.py:440).
 - CLI entrypoint:
-  - [`main()`](eventflow-cli/ef.py:588).
-
-Acceptance Criteria (eventflow_cli lightweight CLI):
-- Entrypoint and parser: [`make_parser()`](eventflow-cli/eventflow_cli/main.py:4), [`main()`](eventflow-cli/eventflow_cli/main.py:31).
-- Subcommands:
-  - Build: [`handle()`](eventflow-cli/eventflow_cli/build.py:4).
-  - Run: [`handle()`](eventflow-cli/eventflow_cli/run.py:4).
-  - Profile: [`handle()`](eventflow-cli/eventflow_cli/profile.py:4).
-  - Validate: [`handle()`](eventflow-cli/eventflow_cli/validate.py:4).
+  - Thin launcher [`ef.py`](eventflow-cli/ef.py:1) delegates to canonical [`main()`](eventflow-cli/eventflow_cli/main.py:533).
 
 Module: eventflow-modules (root aggregator)
 Title: Domain module aggregator for audio/vision/robotics/timeseries/wellness/creative
@@ -291,17 +279,17 @@ Acceptance Criteria:
   - Creative: [`creative/__init__.py`](eventflow-modules/eventflow_modules/creative/__init__.py)
 
 System-level End-to-End Workflow (from user input to backend output):
-- Normalize input using ef CLI SAL command [`cmd_sal_stream()`](eventflow-cli/ef.py:263) → SAL [`stream_to_jsonl()`](eventflow-sal/api.py:192) → drivers via registry [`resolve_source()`](eventflow-sal/eventflow_sal/registry.py:19).
+- Normalize input using ef CLI SAL command [`cmd_sal_stream()`](eventflow-cli/eventflow_cli/main.py:263) → SAL [`stream_to_jsonl()`](eventflow-sal/eventflow_sal/stream.py:192) → drivers via registry [`resolve_source()`](eventflow-sal/eventflow_sal/registry.py:19).
 - Construct an EIR graph using builders (e.g., [`keyword_spotter()`](eventflow-modules/eventflow_modules/audio/kws.py:6)) returning [`EIRGraph`](eventflow-core/eventflow_core/eir/graph.py:17).
-- Validate/serialize via core validators [`validate_eir()`](eventflow-core/validators.py:521) and EIR IO [`save()`](eventflow-core/eventflow_core/eir/serialize.py:5)/[`load()`](eventflow-core/eventflow_core/eir/serialize.py:10).
-- Plan/execute via ef CLI [`cmd_build()`](eventflow-cli/ef.py:503)/[`cmd_run()`](eventflow-cli/ef.py:534) using registry [`load_backend()`](eventflow-backends/registry/registry.py:155), generating golden traces via [`run_cpu_sim()`](eventflow-backends/cpu_sim/executor.py:188) or [`run_gpu_sim()`](eventflow-backends/gpu_sim/executor.py:183).
-- Conformance via ef CLI [`cmd_compare_traces()`](eventflow-cli/ef.py:570) → comparator [`trace_equivalent()`](eventflow-core/eventflow_core/conformance/compare.py:2).
-- Packaging via ef CLI [`cmd_package()`](eventflow-cli/ef.py:402) validated by core [`validate_efpkg()`](eventflow-core/validators.py:676); archive via hub [`pack_bundle()`](eventflow-hub/eventflow_hub/pack.py:6) and store in local hub [`add()`](eventflow-hub/eventflow_hub/registry.py:27).
+- Validate/serialize via core validators [`validate_eir()`](eventflow-core/eventflow_core/validators.py:521) and EIR IO [`save()`](eventflow-core/eventflow_core/eir/serialize.py:5)/[`load()`](eventflow-core/eventflow_core/eir/serialize.py:10).
+- Plan/execute via ef CLI [`cmd_build()`](eventflow-cli/eventflow_cli/main.py:503)/[`cmd_run()`](eventflow-cli/eventflow_cli/main.py:534) using registry [`load_backend()`](eventflow-backends/eventflow_backends/registry.py:155), generating golden traces via [`run_cpu_sim()`](eventflow-backends/eventflow_backends/cpu_sim/executor.py:188) or [`run_gpu_sim()`](eventflow-backends/eventflow_backends/gpu_sim/executor.py:183).
+- Conformance via ef CLI [`cmd_compare_traces()`](eventflow-cli/eventflow_cli/main.py:570) → comparator [`trace_equivalent()`](eventflow-core/eventflow_core/conformance/compare.py:2).
+- Packaging via ef CLI [`cmd_package()`](eventflow-cli/eventflow_cli/main.py:402) validated by core [`validate_efpkg()`](eventflow-core/eventflow_core/validators.py:676); archive via hub [`pack_bundle()`](eventflow-hub/eventflow_hub/pack.py:6) and store in local hub [`add()`](eventflow-hub/eventflow_hub/registry.py:27).
 
 Coverage Confirmation:
 - eventflow-modules: all builders and __init__.py files for audio, vision, robotics, timeseries, wellness, creative are referenced.
 - eventflow-core: graph, ops, types, serialize, validate, runtime (exec/scheduler/trace), validators, conformance compare, and namespace init stubs.
 - eventflow-sal: top-level wrapper, high-level API, open/registry, api/* (source, uri, packet, dcd), calib/*, drivers/*, sync/*, util/*, and stubs.
-- eventflow-backends: façade, in-process registry, backend API, cpu_sim backend and executor, gpu_sim executor, dynamic registry; package stubs.
+- eventflow-backends: package API, backend API, cpu_sim/gpu_sim executors, and dynamic registry.
 - eventflow-hub: client, registry, pack, schemas, auth, errors.
-- eventflow-cli: ef.py commands and lightweight eventflow_cli handlers and parser.
+- eventflow-cli: thin `ef.py` launcher with canonical command behavior in `eventflow_cli/main.py`.

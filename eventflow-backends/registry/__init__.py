@@ -1,1 +1,0 @@
-"""Backend submodule stub"""

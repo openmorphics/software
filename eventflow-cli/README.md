@@ -1,28 +1,71 @@
 # EventFlow CLI
 
-Build, run, profile, normalize streams, and validate EventFlow artifacts.
+Canonical CLI package for EventFlow.
 
-Commands (selected)
-- list-backends — discover available backends
-- sal-stream — normalize a SAL URI (vision.dvs, audio.mic, imu.6dof) into Event Tensor JSONL; supports --telemetry-out
-- build — plan execution for a backend (JSON plan)
-- run — execute a plan (or plan-on-the-fly) and emit a golden trace
-- profile (trace-stats) — compute statistics for Event Tensor JSONL
-- compare-traces — conformance (golden vs candidate)
-- validate-* — schema and semantic validators
-- package — emit EFPKG manifest (EIR, traces, inputs, hashes, metadata)
+- Canonical implementation: `eventflow-cli/eventflow_cli/main.py`
+- Repo-local launcher: `eventflow-cli/ef.py` (thin delegate)
+- Installed script: `eventflow`
 
-JSON output mode
-- Add --json to emit machine-readable JSON where supported (sal-stream, compare-traces, version, list-backends, package, validators).
+## Local Usage
 
-Examples
-- python
-  ef --json sal-stream \
-    --uri "vision.dvs://file?format=jsonl&path=examples/vision_optical_flow/traces/inputs/vision_sample.jsonl" \
-    --out out/vision.norm.jsonl --telemetry-out out/vision.telemetry.json
+From repository root:
 
-- python
-  ef --json compare-traces \
-    --golden examples/vision_optical_flow/traces/golden/vision.golden.jsonl \
-    --candidate out/vision.norm.jsonl \
-    --eps-time-us 50 --eps-numeric 1e-5
+```bash
+python eventflow-cli/ef.py --help
+```
+
+## Command Surface
+
+- `version`
+- `list-backends`
+- `validate`
+- `sal-stream`
+- `profile`
+- `trace-stats`
+- `package`
+- `build`
+- `run`
+- `compare-traces`
+- `hub`
+
+Use `--json` for machine-readable output.
+
+## Core Examples
+
+```bash
+python eventflow-cli/ef.py --json list-backends
+
+python eventflow-cli/ef.py --json validate --eir examples/vision_optical_flow/eir.json
+
+python eventflow-cli/ef.py --json build \
+  --eir examples/vision_optical_flow/eir.json \
+  --backend cpu-sim \
+  --plan-out out/vision.plan.json
+
+python eventflow-cli/ef.py --json run \
+  --eir examples/vision_optical_flow/eir.json \
+  --backend cpu-sim \
+  --input examples/vision_optical_flow/traces/inputs/vision_sample.jsonl \
+  --trace-out out/vision.trace.jsonl
+
+python eventflow-cli/ef.py --json compare-traces \
+  --golden examples/vision_optical_flow/traces/golden/vision.golden.jsonl \
+  --candidate out/vision.trace.jsonl
+```
+
+## Exit Codes
+
+- `0` success
+- `1` runtime/validation/conformance failure
+- `2` argument or IO usage error
+
+## Testing
+
+```bash
+python -m pytest -q eventflow-cli/tests -rs
+```
+
+## Notes
+
+- Grouped `validate` is canonical; legacy `validate-*` aliases are intentionally removed.
+- Run from repo root for path-bootstrap behavior in tests and local launcher use.

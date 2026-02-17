@@ -149,12 +149,148 @@ jobs:
           EF_ARTIFACT_LABEL: ${{ matrix.artifact_label }}
           EF_BUILD_SDIST: ${{ matrix.sdist && '1' || '0' }}
 
+  build-python-packages:
+    name: Build pure Python packages (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Build wheels and sdists (sal/backends/cli/hub)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install -U pip build
+          mkdir -p dist
+          for pkg in eventflow-sal eventflow-backends eventflow-cli eventflow-hub; do
+            python -m build --sdist --wheel -o dist "$pkg"
+          done
+          ls -la dist
+
+      - name: Upload pure package artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: eventflow-python-wheels-Linux-x86_64
+          path: dist/*
+          if-no-files-found: error
+
+  test-artifacts:
+    name: Install and smoke test built artifacts (Linux)
+    runs-on: ubuntu-latest
+    needs:
+      - build-core
+      - build-modules
+      - build-python-packages
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Download all built artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: "*-wheels-*"
+          path: wheelhouse
+          merge-multiple: true
+
+      - name: Install compatible wheels in clean venv
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m venv .venv
+          . .venv/bin/activate
+          python -m pip install -U pip packaging
+          python - <<'PY'
+          import glob
+          import pathlib
+          import subprocess
+          import sys
+          from packaging.tags import sys_tags
+          from packaging.utils import parse_wheel_filename
+
+          wheel_paths = glob.glob("wheelhouse/**/*.whl", recursive=True)
+          if not wheel_paths:
+              raise SystemExit("no wheel artifacts found")
+
+          supported = set(sys_tags())
+          selected = []
+          for path in wheel_paths:
+              name = pathlib.Path(path).name
+              _, _, _, tags = parse_wheel_filename(name)
+              if tags & supported:
+                  selected.append(path)
+
+          if not selected:
+              raise SystemExit("no wheels compatible with this Linux test runner")
+
+          subprocess.check_call([sys.executable, "-m", "pip", "install", *selected])
+          print(f"installed {len(selected)} compatible wheels")
+          PY
+
+      - name: Run artifact-only CLI smoke tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          . .venv/bin/activate
+          python - <<'PY'
+          import json
+          import pathlib
+          import subprocess
+          import sys
+
+          def run(*args: str):
+              proc = subprocess.run(["eventflow", *args], capture_output=True, text=True, check=False)
+              if proc.returncode != 0:
+                  raise SystemExit(f"command failed rc={proc.returncode}: {' '.join(args)}\nstdout={proc.stdout}\nstderr={proc.stderr}")
+              try:
+                  return json.loads(proc.stdout)
+              except Exception as exc:
+                  raise SystemExit(f"invalid JSON output for {' '.join(args)}: {exc}\nstdout={proc.stdout}") from exc
+
+          ver = run("--json", "version")
+          if "version" not in ver:
+              raise SystemExit("version payload missing 'version'")
+
+          backends = run("--json", "list-backends")
+          names = backends.get("backends", [])
+          if "cpu-sim" not in names:
+              raise SystemExit(f"cpu-sim missing from backend list: {names}")
+
+          trace_out = pathlib.Path("out/release_artifact_smoke.trace.jsonl")
+          trace_out.parent.mkdir(parents=True, exist_ok=True)
+          res = run(
+              "--json",
+              "run",
+              "--eir",
+              "examples/wakeword/eir.json",
+              "--backend",
+              "cpu-sim",
+              "--input",
+              "examples/wakeword/traces/inputs/audio_sample.jsonl",
+              "--trace-out",
+              str(trace_out),
+          )
+          if res.get("status") != "ok" or not trace_out.is_file():
+              raise SystemExit(f"run smoke failed: {res}")
+          PY
+
   publish:
     name: Publish distributions
     runs-on: ubuntu-latest
     needs:
       - build-core
       - build-modules
+      - build-python-packages
+      - test-artifacts
     steps:
       - name: Download all wheel artifacts
         uses: actions/download-artifact@v4
@@ -162,6 +298,13 @@ jobs:
           pattern: "*-wheels-*"
           path: dist
           merge-multiple: true
+
+      - name: Verify distributions with twine check
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install -U twine
+          python -m twine check dist/*
 
       - name: List downloaded artifacts
         shell: bash
