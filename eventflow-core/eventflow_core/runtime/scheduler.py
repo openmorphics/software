@@ -6,6 +6,7 @@ from ..eir.ops import (
     step_lif, LIFState, step_exp_syn, step_delay, Event,
     step_stft, step_mel, build_mel_filters,
     step_xy_to_ch, step_shift_xy,
+    step_event_bucket, step_event_filter,
 )
 from ..eir.types import time_to_ns
 
@@ -85,4 +86,14 @@ def build_exec_nodes(g: EIRGraph) -> Dict[str, ExecNode]:
             dx = int(p.get("dx", 0)); dy = int(p.get("dy", 0))
             w = int(p.get("width", 128)); h = int(p.get("height", 128))
             nodes[nid] = ExecNode(k, lambda it, dx=dx, dy=dy, w=w, h=h: step_shift_xy(it, dx, dy, w, h), None)
+        elif k=="bucket":
+            dt_ns = int(p.get("dt_ns", 0)); count = int(p.get("count", 1))
+            nodes[nid] = ExecNode(k, lambda it, dt_ns=dt_ns, count=count: step_event_bucket(it, dt_ns, count), None)
+        elif k=="bucket_sum":
+            dt_ns = time_to_ns(p.get("window", "1 s"))
+            count = int(p.get("buckets", 128))
+            nodes[nid] = ExecNode(k, lambda it, dt_ns=dt_ns, count=count: step_event_bucket(it, dt_ns, count), None)
+        elif k=="event_filter":
+            min_count = int(p.get("min_count", 1))
+            nodes[nid] = ExecNode(k, lambda it, min_count=min_count: step_event_filter(it, min_count), None)
     return nodes

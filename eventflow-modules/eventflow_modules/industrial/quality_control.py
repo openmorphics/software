@@ -81,9 +81,11 @@ def quality_control(
     # Create parameter control neurons for each monitored parameter
     for param in params_to_monitor:
         # LIF neuron for parameter deviation detection
-        param_control = LIFNeuron(f"control_{param}",
-                                v_th=int(parameter_tolerance * 100),
-                                tau=5.0).as_op()
+        param_control = LIFNeuron(
+            f"control_{param}",
+            v_th=float(parameter_tolerance),
+            tau_m="5 ms",
+        ).as_op()
         g.add_node(f"control_{param}", param_control)
 
     # Defect detection using temporal integration

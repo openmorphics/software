@@ -152,7 +152,7 @@ def evapotranspiration_calculation(
     g = EIRGraph()
 
     # Evapotranspiration computation
-    if _ef_native_enabled():
+    if _ef_native_enabled() and _ef_native is not None and hasattr(_ef_native, "et_calculate"):
         et_op = _ef_native.et_calculate(crop_coefficient, reference_et, calculation_window).as_op()
     else:
         et_op = EventFuse("et", window=calculation_window, min_count=1).as_op()

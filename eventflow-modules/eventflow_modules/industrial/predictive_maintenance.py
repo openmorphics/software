@@ -80,9 +80,11 @@ def predictive_maintenance(
     # Create anomaly detection neurons for each pattern
     for pattern in patterns:
         # LIF neuron for anomaly detection with adaptive threshold
-        anomaly_detector = LIFNeuron(f"anomaly_{pattern}",
-                                   v_th=int(anomaly_sensitivity * 100),
-                                   tau=10.0).as_op()
+        anomaly_detector = LIFNeuron(
+            f"anomaly_{pattern}",
+            v_th=float(anomaly_sensitivity),
+            tau_m="10 ms",
+        ).as_op()
         g.add_node(f"anomaly_{pattern}", anomaly_detector)
 
     # Health assessment using temporal integration

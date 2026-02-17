@@ -162,7 +162,7 @@ def pest_detection(
     g = EIRGraph()
 
     # Multimodal pest detection
-    if _ef_native_enabled():
+    if _ef_native_enabled() and _ef_native is not None and hasattr(_ef_native, "pest_detect"):
         pest_op = _ef_native.pest_detect(detection_sensitivity, monitoring_window).as_op()
     else:
         pest_op = EventFuse("pest_detect", window=monitoring_window, min_count=int(detection_sensitivity * 100)).as_op()

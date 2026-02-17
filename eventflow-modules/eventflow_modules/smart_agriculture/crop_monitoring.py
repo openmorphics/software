@@ -110,7 +110,7 @@ def ndvi_analysis(
 
     # Band separation and NDVI computation
     # Use native acceleration if available for efficient computation
-    if _ef_native_enabled():
+    if _ef_native_enabled() and _ef_native is not None and hasattr(_ef_native, "ndvi_compute"):
         ndvi_op = _ef_native.ndvi_compute(red_band, nir_band, smoothing_window).as_op()
     else:
         # Fallback implementation using standard ops

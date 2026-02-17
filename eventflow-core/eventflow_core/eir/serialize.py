@@ -21,6 +21,8 @@ def load(path: str) -> EIRGraph:
         "shift_xy": ShiftXY,
     }
     for nid, nd in obj["nodes"].items():
-        g.add_node(nid, kinds[nd["kind"]](nd["name"], **nd["params"]).as_op())
+        params = dict(nd.get("params", {}))
+        params.pop("name", None)
+        g.add_node(nid, kinds[nd["kind"]](nd["name"], **params).as_op())
     for e in obj["edges"]: g.connect(e["src"][0], e["src"][1], e["dst"][0], e["dst"][1])
     return g

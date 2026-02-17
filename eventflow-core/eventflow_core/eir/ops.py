@@ -18,19 +18,90 @@ class ExpSynapse:
 
 @dataclass
 class DelayLine:
-    name: str; delay: str="1 ms"
-    def as_op(self) -> OpDef: return OpDef("delay", self.name, [Port("in")], [Port("out")], self.__dict__)
+    name: str; delay: str="1 ms"; delay_ns: Optional[int]=None
+    def as_op(self) -> OpDef:
+        params = {"delay": self.delay}
+        if self.delay_ns is not None:
+            params["delay"] = f"{int(self.delay_ns)} ns"
+        return OpDef("delay", self.name, [Port("in")], [Port("out")], params)
 
 @dataclass
 class EventFuse:
     name: str; window: str="50 ms"; min_count: int=2
     def as_op(self) -> OpDef: return OpDef("fuse", self.name, [Port("a"), Port("b")], [Port("out")], self.__dict__)
 
+@dataclass
+class EventBucket:
+    name: str; dt_ns: int=0; count: int=1
+    def as_op(self) -> OpDef: return OpDef("bucket", self.name, [Port("in")], [Port("out")], self.__dict__)
+
+@dataclass
+class BucketSum:
+    name: str; buckets: int=128; window: str="1 s"
+    def as_op(self) -> OpDef: return OpDef("bucket_sum", self.name, [Port("in")], [Port("out")], self.__dict__)
+
+@dataclass
+class EventFilter:
+    name: str; min_count: int=1
+    def as_op(self) -> OpDef: return OpDef("event_filter", self.name, [Port("in")], [Port("out")], self.__dict__)
+
 def step_exp_syn(inputs: Iterator[Event], tau_s_ns: int, weight: float) -> Iterator[Event]:
     for t, ch, val, meta in inputs: yield (t, ch, weight * val, {**meta, "syn":"exp", "tau_s_ns":tau_s_ns})
 
 def step_delay(inputs: Iterator[Event], delay_ns: int) -> Iterator[Event]:
     for t, ch, val, meta in inputs: yield (t + delay_ns, ch, val, meta)
+
+def step_event_bucket(inputs: Iterator[Event], dt_ns: int, count: int) -> Iterator[Event]:
+    if dt_ns > 0:
+        cur_bucket = None
+        acc = 0.0
+        n = 0
+        for t, ch, val, meta in inputs:
+            b = (t // dt_ns) * dt_ns
+            if cur_bucket is None:
+                cur_bucket = b
+            if b != cur_bucket and n > 0:
+                yield (cur_bucket + dt_ns, 0, acc, {"unit": "bucket"})
+                cur_bucket = b
+                acc = 0.0
+                n = 0
+            acc += float(val)
+            n += 1
+            if count > 0 and n >= count:
+                yield (b + dt_ns, 0, acc, {"unit": "bucket"})
+                cur_bucket = None
+                acc = 0.0
+                n = 0
+        if cur_bucket is not None and n > 0:
+            yield (cur_bucket + dt_ns, 0, acc, {"unit": "bucket"})
+        return
+
+    if count <= 1:
+        for ev in inputs:
+            yield ev
+        return
+
+    n = 0
+    acc = 0.0
+    last_t = 0
+    for t, ch, val, meta in inputs:
+        last_t = t
+        acc += float(val)
+        n += 1
+        if n >= count:
+            yield (t, 0, acc, {"unit": "bucket"})
+            n = 0
+            acc = 0.0
+    if n > 0:
+        yield (last_t, 0, acc, {"unit": "bucket"})
+
+def step_event_filter(inputs: Iterator[Event], min_count: int) -> Iterator[Event]:
+    threshold = max(1, int(min_count))
+    seen = 0
+    for t, ch, val, meta in inputs:
+        seen += 1
+        if seen >= threshold:
+            yield (t, ch, val, meta)
 
 class LIFState:
     __slots__ = ("v", "t_last_spike_ns", "t_prev_ns", "ref_ns", "tau_m_ns", "r_m", "v_th", "v_reset")

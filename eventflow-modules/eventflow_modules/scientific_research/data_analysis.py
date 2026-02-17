@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import Optional, Dict, Any, List, Tuple, Callable
 from eventflow_core.eir.graph import EIRGraph
-from eventflow_core.eir.ops import EventFuse, DelayLine, EventBucket
+from eventflow_core.eir.ops import EventFuse, DelayLine, EventBucket, EventFilter
 import numpy as np
 import json
 from ..errors import ScientificResearchError

@@ -103,6 +103,30 @@ Owner: Release engineering
   - `python3 -m pytest -q -rs --cov=eventflow_core --cov=eventflow_backends --cov=eventflow_cli --cov=eventflow_sal --cov=eventflow_modules --cov=eventflow_hub --cov-branch --cov-report=json:out/coverage_gate_run_20260216_230403/coverage.json --cov-report=xml:out/coverage_gate_run_20260216_230403/coverage.xml`
   - `python3 tools/check_coverage_gates.py --coverage-json out/coverage_gate_run_20260216_230403/coverage.json`
   - Result: `255 passed, 5 skipped, 5 subtests passed`; coverage gates `PASSED`.
+- Module robustness hardening and compatibility closure:
+  - Added comprehensive domain module contract tests:
+    - `eventflow-modules/tests/test_domain_module_contracts.py`
+  - Added core compatibility and utility tests:
+    - `eventflow-core/tests/test_graph_compat_and_utils.py`
+  - Hardened compatibility/runtime surfaces:
+    - `eventflow-core/eventflow_core/eir/graph.py`
+    - `eventflow-core/eventflow_core/eir/ops.py`
+    - `eventflow-core/eventflow_core/runtime/scheduler.py`
+    - `eventflow-core/eventflow_core/eir/serialize.py`
+  - Fixed module-level robustness defects:
+    - `eventflow-modules/eventflow_modules/industrial/predictive_maintenance.py`
+    - `eventflow-modules/eventflow_modules/industrial/quality_control.py`
+    - `eventflow-modules/eventflow_modules/smart_agriculture/crop_monitoring.py`
+    - `eventflow-modules/eventflow_modules/smart_agriculture/agricultural_automation.py`
+    - `eventflow-modules/eventflow_modules/smart_agriculture/environmental_monitoring.py`
+    - `eventflow-modules/eventflow_modules/scientific_research/data_analysis.py`
+    - `eventflow-modules/eventflow_modules/wellness/sleep.py`
+    - `eventflow-modules/eventflow_modules/wellness/stress.py`
+  - Validation runs:
+    - `python3 -m pytest -q -rs eventflow-modules/tests` => `124 passed, 2 skipped`
+    - `python3 -m pytest -q -rs` => `329 passed, 5 skipped, 5 subtests passed`
+    - `python3 -m pytest -q -rs --cov=eventflow_core --cov=eventflow_backends --cov=eventflow_cli --cov=eventflow_sal --cov=eventflow_modules --cov=eventflow_hub --cov-branch --cov-report=json:out/coverage_gate_run_20260217_000012/coverage.json --cov-report=xml:out/coverage_gate_run_20260217_000012/coverage.xml`
+    - `python3 tools/check_coverage_gates.py --coverage-json out/coverage_gate_run_20260217_000012/coverage.json` => coverage gates `PASSED`
 
 ## Phase 5: Release Documentation and Compliance
 

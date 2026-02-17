@@ -12,6 +12,9 @@ def sleep_staging(
     Sleep staging proxy: periodicity/coincidence over epoch window.
     Provide events to node 'id' at runtime.
     """
+    if not isinstance(window, str) or not window.strip():
+        raise ValueError("window must be a non-empty string")
+
     g = EIRGraph()
     g.add_node("id",    DelayLine("id", delay="0 ms").as_op())
     g.add_node("delay", DelayLine("delay", delay=window).as_op())
