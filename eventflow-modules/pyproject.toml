@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "eventflow-modules"
-version = "0.1.0"
+version = "0.2.0"
 description = "Domain-specific modules for EventFlow"
 readme = "README.md"
 requires-python = ">=3.8"
@@ -20,7 +20,7 @@ classifiers = [
   "Programming Language :: Python :: 3.12",
 ]
 dependencies = [
-  "eventflow-core"
+  "eventflow-core>=0.2.0,<0.3.0"
 ]
 
 [project.urls]

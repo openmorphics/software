@@ -6,6 +6,7 @@ import json
 import os
 import sys
 from typing import Any, List, Optional
+from .license_gate import requires_license
 
 
 CLI_JSON = False
@@ -55,9 +56,9 @@ def _read_json(path: str) -> Any:
 
 def cmd_version(_args: argparse.Namespace) -> None:
     if CLI_JSON:
-        _emit_json({"version": "0.1.0"})
+        _emit_json({"version": "0.2.0"})
     else:
-        print("EventFlow SDK v0.1.0")
+        print("EventFlow SDK v0.2.0")
     sys.exit(0)
 
 
@@ -453,6 +454,65 @@ def cmd_compare_traces(args: argparse.Namespace) -> None:
     sys.exit(0 if res.get("ok") else 1)
 
 
+@requires_license("conformance", tier="Pro")
+def cmd_verify_conformance(args: argparse.Namespace) -> None:
+    _ensure_repo_paths()
+    if "eventflow_conformance" not in sys.modules:
+        # Lazy import
+        try:
+            import eventflow_conformance
+        except ImportError:
+            _fail("eventflow-conformance package not found. It is required for this command.", 1)
+
+    from eventflow_conformance import ConformanceValidator, EvidenceExporter
+    from eventflow_license import LicenseValidator
+
+    eir_path = args.eir
+    if not os.path.exists(eir_path):
+        _fail(f"EIR file not found: {eir_path}", 2)
+
+    try:
+        with open(eir_path, "r") as f:
+            eir_data = json.load(f)
+    except Exception as e:
+        _fail(f"failed to read EIR: {e}", 2)
+
+    validator = ConformanceValidator(args.cert_profile)
+    violations = validator.validate(eir_data)
+
+    license_val = LicenseValidator()
+    org_name = license_val.get_status().get("org", "Unknown")
+
+    exporter = EvidenceExporter(eir_path)
+    report = exporter.generate_report(
+        profile=args.cert_profile,
+        violations=violations,
+        backend_info={"name": "cli-verifier"},
+        org_name=org_name
+    )
+
+    if args.evidence_out:
+        exporter.export(report, args.evidence_out)
+
+    if CLI_JSON:
+        _emit_json({
+            "ok": len(violations) == 0,
+            "profile": args.cert_profile,
+            "violations": violations,
+            "report": report if not args.evidence_out else None,
+            "evidence_path": args.evidence_out
+        })
+    else:
+        if not violations:
+            print(f"Conformance check PASSED for profile {args.cert_profile}")
+        else:
+            print(f"Conformance check FAILED for profile {args.cert_profile}:")
+            for v in violations:
+                print(f"  - {v}")
+        if args.evidence_out:
+            print(f"Evidence report exported to: {args.evidence_out}")
+
+
 def cmd_hub(args: argparse.Namespace) -> None:
     from . import hub
 
@@ -537,6 +597,13 @@ def make_parser() -> argparse.ArgumentParser:
     hub_parser = sub.add_parser("hub", help="EventFlow Hub package management")
     hub.add_hub_subparser(hub_parser)
     hub_parser.set_defaults(func=cmd_hub)
+
+    # Conformance
+    p_conf = sub.add_parser("verify-conformance", help="[PRO] Verify graph conformance and export evidence")
+    p_conf.add_argument("--eir", required=True, help="Path to EIR JSON")
+    p_conf.add_argument("--cert-profile", default="BASE", help="Certification profile (BASE|AUTOMOTIVE_ISO26262|MEDICAL_IEC62304)")
+    p_conf.add_argument("--evidence-out", help="Path to export evidence JSON report")
+    p_conf.set_defaults(func=cmd_verify_conformance)
 
     return p
 

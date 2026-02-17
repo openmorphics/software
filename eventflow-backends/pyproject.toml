@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "eventflow-backends"
-version = "0.1.0"
+version = "0.2.0"
 description = "EventFlow backend plugin registry and CPU simulator"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -18,13 +18,8 @@ classifiers = [
   "Programming Language :: Python :: 3.12",
 ]
 dependencies = [
-  "eventflow-core",
+  "eventflow-core>=0.2.0,<0.3.0",
 ]
-
-[project.entry-points.eventflow_backends]
-loihi = "eventflow_backends.vendor_backends.loihi:LoihiBackend"
-spinnaker = "eventflow_backends.vendor_backends.spinnaker:SpiNNakerBackend"
-synsense = "eventflow_backends.vendor_backends.synsense:SynSenseBackend"
 
 [tool.setuptools.packages.find]
 where = ["."]
@@ -38,7 +33,4 @@ eventflow_backends = [
   "cpu_sim/*.json",
   "gpu_sim/*.json",
   "riscv_sim/*.json",
-  "vendor_backends/loihi/*.json",
-  "vendor_backends/spinnaker/*.json",
-  "vendor_backends/synsense/*.json",
 ]

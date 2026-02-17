@@ -161,22 +161,41 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Build wheels and sdists (sal/backends/cli/hub)
+      - name: Build wheels and sdists (sal/backends/cli/hub/license)
         shell: bash
         run: |
           set -euo pipefail
           python -m pip install -U pip build
           mkdir -p dist
-          for pkg in eventflow-sal eventflow-backends eventflow-cli eventflow-hub; do
+          # Build OSS and internal common packages
+          for pkg in eventflow-sal eventflow-backends eventflow-cli eventflow-hub eventflow-license; do
             python -m build --sdist --wheel -o dist "$pkg"
           done
           ls -la dist
+
+      - name: Build Pro wheels and sdists (backends-pro/conformance)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install -U pip build
+          mkdir -p dist-pro
+          for pkg in eventflow-backends-pro eventflow-conformance; do
+            python -m build --sdist --wheel -o dist-pro "$pkg"
+          done
+          ls -la dist-pro
 
       - name: Upload pure package artifacts
         uses: actions/upload-artifact@v4
         with:
           name: eventflow-python-wheels-Linux-x86_64
           path: dist/*
+          if-no-files-found: error
+
+      - name: Upload Pro package artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: eventflow-pro-wheels-Linux-x86_64
+          path: dist-pro/*
           if-no-files-found: error
 
   test-artifacts:
@@ -343,3 +362,39 @@ jobs:
           packages-dir: dist
           password: ${{ secrets.PYPI_API_TOKEN }}
           skip-existing: true
+
+  publish-pro:
+    name: Publish Pro distributions
+    runs-on: ubuntu-latest
+    needs:
+      - build-python-packages
+      - test-artifacts
+    steps:
+      - name: Download Pro wheel artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: eventflow-pro-wheels-Linux-x86_64
+          path: dist-pro
+
+      - name: Download license wheel
+        uses: actions/download-artifact@v4
+        with:
+          name: eventflow-python-wheels-Linux-x86_64
+          path: dist-pro
+          # Only need the license wheel for pro index
+          # In a real impl, we'd filter or just upload everything to pro index too
+
+      - name: Publish to Private Index
+        shell: bash
+        env:
+          PRIVATE_PYPI_URL: ${{ secrets.PRIVATE_PYPI_URL }}
+          PRIVATE_PYPI_TOKEN: ${{ secrets.PRIVATE_PYPI_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$PRIVATE_PYPI_URL" ]]; then
+            echo "Skipping private publish: PRIVATE_PYPI_URL not set"
+            exit 0
+          fi
+          python -m pip install -U twine
+          # In real impl: twine upload --repository-url "$PRIVATE_PYPI_URL" -u __token__ -p "$PRIVATE_PYPI_TOKEN" dist-pro/*
+          echo "STUB: Would upload to $PRIVATE_PYPI_URL"

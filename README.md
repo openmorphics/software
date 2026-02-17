@@ -1,14 +1,30 @@
-# EventFlow
+# EventFlow SDK
 
-EventFlow is a multi-package SDK for deterministic, event-driven pipelines.
-It includes:
+EventFlow is a domain-specific language and multi-package SDK for deterministic, event-driven neuromorphic computing.
 
-- `eventflow-core`: runtime, validators, conformance comparator
-- `eventflow-sal`: SAL URI normalization to Event Tensor JSONL
-- `eventflow-backends`: backend registry + `cpu-sim` / `gpu-sim`
-- `eventflow-cli`: canonical CLI (`eventflow_cli.main`) + thin repo launcher (`eventflow-cli/ef.py`)
-- `eventflow-modules`: domain modules and optional native acceleration
-- `eventflow-hub`: local package registry utilities
+## Distribution Tiers
+
+| Feature | Community | Pro |
+| :--- | :---: | :---: |
+| Core Runtime & EIR | ✅ | ✅ |
+| CPU/GPU Simulation | ✅ | ✅ |
+| Reference Modules | ✅ | ✅ |
+| Hardware Execution (Loihi/etc) | ❌ | ✅ |
+| Conformance Verification | ❌ | ✅ |
+| Audit Evidence Export | ❌ | ✅ |
+
+See [Licensing](docs/LICENSING.md) for details.
+
+## Packages
+
+- `eventflow-core`: core runtime and EIR graph engine
+- `eventflow-sal`: sensor abstraction layer
+- `eventflow-backends`: community simulator backends
+- `eventflow-cli`: unified command-line interface
+- `eventflow-modules`: reference domain modules
+- `eventflow-hub`: package management utilities
+- `eventflow-backends-pro` (Pro): certified hardware adapters
+- `eventflow-conformance` (Pro): audit-grade verification
 
 ## Repository Layout
 

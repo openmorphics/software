@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "eventflow-backends-pro"
+version = "0.2.0"
+description = "EventFlow Pro backend plugin registry with certified vendor adapters"
+readme = "README.md"
+requires-python = ">=3.9"
+license = "Proprietary"
+authors = [{name="EventFlow Team"}]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+  "eventflow-core>=0.2.0,<0.3.0",
+  "eventflow-backends>=0.2.0,<0.3.0",
+  "eventflow-license>=0.2.0",
+]
+
+[project.entry-points.eventflow_backends]
+loihi = "eventflow_backends_pro.vendor_backends.loihi:LoihiBackend"
+spinnaker = "eventflow_backends_pro.vendor_backends.spinnaker:SpiNNakerBackend"
+synsense = "eventflow_backends_pro.vendor_backends.synsense:SynSenseBackend"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["eventflow_backends_pro*"]
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.package-data]
+eventflow_backends_pro = [
+  "vendor_backends/loihi/*.json",
+  "vendor_backends/spinnaker/*.json",
+  "vendor_backends/synsense/*.json",
+]

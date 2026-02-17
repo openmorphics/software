@@ -3,12 +3,12 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "eventflow-cli"
+name = "eventflow-conformance"
 version = "0.2.0"
-description = "EventFlow CLI"
+description = "EventFlow Pro audit-grade conformance verification and evidence export"
 readme = "README.md"
 requires-python = ">=3.9"
-license = "BSD-3-Clause"
+license = "Proprietary"
 authors = [{name="EventFlow Team"}]
 classifiers = [
   "Programming Language :: Python :: 3",
@@ -19,15 +19,5 @@ classifiers = [
 ]
 dependencies = [
   "eventflow-core>=0.2.0,<0.3.0",
-  "eventflow-sal>=0.2.0,<0.3.0",
-  "eventflow-backends>=0.2.0,<0.3.0",
-  "eventflow-hub>=0.2.0,<0.3.0",
   "eventflow-license>=0.2.0",
 ]
-
-[project.scripts]
-eventflow = "eventflow_cli.main:main"
-
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["eventflow_cli*"]
