@@ -1,13 +1,33 @@
 # EventFlow Pro Backends
 
-This package contains certified vendor-specific neuromorphic hardware adapters for the EventFlow SDK.
+`eventflow-backends-pro` contains proprietary vendor adapter scaffolding for neuromorphic hardware targets.
 
-## Included Backends
+## Current State
 
-- **Intel Loihi**: Integration with NxSDK for Loihi 1 and Loihi 2.
-- **SpiNNaker**: Support for SpiNNaker neuromorphic computing boards.
-- **SynSense**: Support for Xylo and DYNAP ultra-low-power processors.
+- Included adapter families: Loihi, SpiNNaker, and SynSense.
+- The package exposes entry points and backend-shaped modules for integration work.
+- Actual hardware execution is not guaranteed by this repository. It depends on vendor SDK availability, real hardware access, matching runtime configuration, and a valid license.
+- When vendor SDKs or hardware are absent, adapters can run in stub mode and report that no real hardware execution occurred.
 
 ## Licensing
 
-This is a **Pro** package and requires a valid EventFlow Pro or Enterprise license to execute on physical hardware. Use `eventflow license install <key>` to activate.
+This is a proprietary package. Use it only in environments where the relevant EventFlow Pro or Enterprise license and vendor SDK terms are satisfied.
+
+The CLI may gate Pro features through `eventflow-license`; this package does not by itself provide certification or hardware access.
+
+## Local Development
+
+From the repository root:
+
+```bash
+python -m pip install -e ./eventflow-license -e ./eventflow-core -e ./eventflow-backends
+python -m pip install -e ./eventflow-backends-pro
+```
+
+## Testing
+
+```bash
+python -m pytest -q eventflow-backends/tests/test_loihi.py eventflow-backends/tests/test_spinnaker.py eventflow-backends/tests/test_synsense.py -rs
+```
+
+Those tests validate adapter shape and error contracts. They do not prove live hardware execution.

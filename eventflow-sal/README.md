@@ -1,40 +1,54 @@
 # EventFlow SAL
 
-Sensor Abstraction Layer (SAL) for EventFlow. SAL normalizes heterogeneous, event-based sensor sources (DVS, audio, IMU, etc.) into deterministic Event Tensor JSONL streams with unit-checked headers, canonical ordering, and timing telemetry.
+`eventflow-sal` is the Sensor Abstraction Layer. Its useful job today is normalizing supported file/replay sources into deterministic Event Tensor JSONL streams with headers, canonical ordering, and timing telemetry.
 
-Features
-- URI-based source discovery and configuration (vision.dvs, audio.mic, imu.6dof)
-- Deterministic JSONL normalization with header + records
-- Timestamp handling with drift/jitter estimation, dt percentiles (p50/p95/p99), and jitter summary (jitter_p50_us/p95/p99)
-- Compatibility shim for existing Event Tensor JSONL (pass-through normalization)
-- Telemetry JSON output for reproducible pipelines
+## Current State
 
-Quick Start
-- python
-  ef --json sal-stream \
-    --uri "vision.dvs://file?format=jsonl&path=examples/vision_optical_flow/traces/inputs/vision_sample.jsonl" \
-    --out out/vision.norm.jsonl --telemetry-out out/vision.telemetry.json
+- Working today: JSONL pass-through normalization, WAV/audio band extraction paths, CSV-style IMU replay paths, URI parsing, packet structures, telemetry, and deterministic stream output.
+- Partially implemented: several domain-specific replay drivers exist as simple synthetic/file adapters.
+- Stubbed: live device sources for DVS, microphone, IMU, tactile, bio, industrial, environmental, security, and similar domains mostly yield no events unless a file/replay path is implemented.
+- Intentional contract: opening JSONL directly through `open()` is unsupported; deterministic normalization should go through `stream_to_jsonl()`.
 
-- python
-  ef --json sal-stream \
-    --uri "audio.mic://file?path=examples/wakeword/audio.wav&window_ms=20&hop_ms=10&bands=32" \
-    --out out/audio_bands.jsonl --telemetry-out out/audio_bands.telemetry.json
+## Quick Start
 
-API
-- [stream.py](eventflow-sal/eventflow_sal/stream.py) exposes stream_to_jsonl(uri, out, **opts) → telemetry dict
-- Drivers and registry:
-  - [registry.py](eventflow-sal/eventflow_sal/registry.py)
-  - [drivers/dvs.py](eventflow-sal/eventflow_sal/drivers/dvs.py)
-  - [drivers/audio.py](eventflow-sal/eventflow_sal/drivers/audio.py)
-  - [drivers/imu.py](eventflow-sal/eventflow_sal/drivers/imu.py)
-- Data structures:
-  - [api/packet.py](eventflow-sal/eventflow_sal/api/packet.py)
-  - [api/uri.py](eventflow-sal/eventflow_sal/api/uri.py)
+From the repository root after editable installation:
 
-Event Tensor JSONL
-- Header (first line): {"header": { schema_version, dims, units, dtype, layout, metadata }}
-- Event record lines: {"ts": <us>, "idx": [...], "val": <float|int>}
+```bash
+python eventflow-cli/ef.py --json sal-stream \
+  --uri "vision.dvs://file?format=jsonl&path=examples/vision_optical_flow/traces/inputs/vision_sample.jsonl" \
+  --out out/vision.norm.jsonl \
+  --telemetry-out out/vision.telemetry.json
 
-Notes
-- For existing Event Tensor JSONL, use vision.dvs://file?format=jsonl&path=... to enable pass-through normalization (adds telemetry and ensures header).
-- Opening JSONL directly via SAL open() is intentionally unsupported; normalization must go through stream_to_jsonl for deterministic behavior.
+python eventflow-cli/ef.py --json sal-stream \
+  --uri "audio.mic://file?path=examples/wakeword/audio.wav&window_ms=20&hop_ms=10&bands=32" \
+  --out out/audio_bands.jsonl \
+  --telemetry-out out/audio_bands.telemetry.json
+```
+
+## API
+
+- `eventflow_sal.stream.stream_to_jsonl(uri, out, **opts)`: normalize a source URI to Event Tensor JSONL and return telemetry.
+- `eventflow_sal.registry`: resolve supported URI schemes into source implementations.
+- `eventflow_sal.api.packet`: Event Tensor packet/header data structures.
+- `eventflow_sal.api.uri`: URI parsing helpers.
+
+## Event Tensor JSONL
+
+The first line is a header:
+
+```json
+{"header": {"schema_version": "...", "dims": [], "units": {}, "dtype": "...", "layout": "...", "metadata": {}}}
+```
+
+Subsequent lines are event records:
+
+```json
+{"ts": 0, "idx": [0], "val": 1.0}
+```
+
+## Testing
+
+```bash
+python -m pytest -q eventflow-sal/tests -rs
+python -m pytest -q tests/unit/test_sal_driver_smoke.py tests/unit/test_sal_registry_dispatch.py -rs
+```

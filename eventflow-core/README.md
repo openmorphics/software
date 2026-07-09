@@ -1,135 +1,111 @@
 # EventFlow Core
 
+`eventflow-core` is the runtime and EIR package. It is one of the more substantial parts of the repository: graph types, operators, validation, serialization, event-mode execution, scheduling, trace helpers, conformance comparison helpers, and optional Rust acceleration all live here.
 
-## Native acceleration toggle (EF_NATIVE)
-The Rust native extension for eventflow-core is optionally enabled at import time via the EF_NATIVE environment variable. Behavior:
-- EF_NATIVE=1: force enable if available; warns and falls back to Python if the native module fails to import.
-- EF_NATIVE=0: force disable; always use pure Python.
-- Unset: auto; use native when available.
+The pure-Python path is the baseline. Native acceleration is optional and must be built or installed before native parity/performance claims are meaningful.
 
-See loader in [eventflow_core._rust.__init__](eventflow-core/eventflow_core/_rust/__init__.py).
+## Current State
 
-## Exception types
-Use exceptions from eventflow_core.errors. These alias to the native exception classes when the native module is available, so user code can catch a single canonical type regardless of backend:
-- BucketError: raised by native bucket_sum_i64_f32 for invalid arguments (e.g., dt_ns &lt;= 0, length mismatch).
-- FuseError: raised by native fuse_coincidence_i64 for invalid arguments (e.g., window_ns &lt;= 0).
+- Working today: EIR graph construction, core ops, validation, runtime execution, scheduler modes, trace output, and conformance comparison utilities.
+- Optional native extension: Rust kernels are exposed through `eventflow_core._rust._native` when importable.
+- Honest limitation: native tests and speedup gates do not prove anything unless the native extension has been built in the active environment.
+- Scope boundary: this package is the runtime core, not hardware execution and not a full domain algorithm library.
 
-Example:
-- from eventflow_core.errors import BucketError, FuseError
+## Installation
 
-## Minimal structured logging bridge
-A small synchronous logging bridge is exposed by the native module:
-- set_log_sink(sink): store a Python callable to receive logs as sink(level, message). Passing None clears it. A convenience re-export exists at eventflow_core._rust.set_log_sink when native is present.
-- log_emit(level, message): emits to the sink if set. Accessible as eventflow_core._rust.native.log_emit.
+From a released wheel:
 
-Notes:
-- Compute paths do not log by default.
-- Do not expect callbacks from sections where the GIL is released; log_emit must run while holding the GIL (native PyO3 functions do).
+```bash
+python -m pip install eventflow-core
+```
 
-Usage snippet:
-- from eventflow_core._rust import set_log_sink
-- from eventflow_core._rust import native as core_native
-- def sink(level, message): print(level, message)
-- set_log_sink(sink)
-- core_native.log_emit("INFO", "hello from native")
-- set_log_sink(None)  # clear
+For local development from the repository root:
 
+```bash
+python -m pip install -e ./eventflow-core
+```
 
-## Installation and wheels
+To force a local release-mode native build:
 
-Prebuilt abi3 wheels are provided for:
-- Python 3.8–3.12
-- macOS universal2
-- manylinux_2_28 and musllinux
-- Windows (MSVC)
+```bash
+python -m pip install -U maturin
+cd eventflow-core
+python -m maturin develop -r
+```
 
-Install from a wheel (recommended):
-- pip install eventflow-core
+## Native Acceleration
 
-Build locally (development):
-- python -m pip install -U maturin
-- cd eventflow-core
-- python -m maturin develop -r
+`EF_NATIVE` controls whether the Rust extension is used:
 
-This installs the native extension at eventflow_core._rust._native alongside the pure-Python package.
-
-## EF_NATIVE toggle recap and examples
-
-The Rust native extension is optional and controlled by EF_NATIVE:
-
-- EF_NATIVE=1: force enable if available; warns and falls back to Python if import fails.
-- EF_NATIVE=0: force disable; always use pure Python.
-- Unset: auto; use native when available.
+- `EF_NATIVE=1`: force native if importable; warn and fall back if import fails.
+- `EF_NATIVE=0`: disable native and use pure Python.
+- unset: auto-detect native and use it when available.
 
 Examples:
-- EF_NATIVE=1 python -c "import eventflow_core._rust as r; print(r.is_enabled())"
-- EF_NATIVE=0 python -c "import eventflow_core._rust as r; print(r.is_enabled())"
+
+```bash
+EF_NATIVE=1 python -c "import eventflow_core._rust as r; print(r.is_enabled())"
+EF_NATIVE=0 python -c "import eventflow_core._rust as r; print(r.is_enabled())"
+```
 
 Programmatic check:
-- from eventflow_core._rust import is_enabled, native
-- if is_enabled(): print("native active")
 
-## Exceptions and logging bridge
+```python
+from eventflow_core._rust import is_enabled
 
-Use canonical exceptions from eventflow_core.errors (aliased to native classes when loaded):
-- from eventflow_core.errors import BucketError, FuseError
+if is_enabled():
+    print("native active")
+```
 
-Set a synchronous logging sink (no GIL-released callbacks):
-- from eventflow_core._rust import native, set_log_sink
-- def sink(level, message): print(f"[{level}] {message}")
-- set_log_sink(sink)
-- native.log_emit("INFO", "hello from native")
-- set_log_sink(None)  # clear
+## Exceptions and Logging
 
-Notes:
-- Logging callbacks are synchronous and must run while the GIL is held.
-- Compute-heavy paths generally avoid logging.
+Use canonical exceptions from `eventflow_core.errors`. They alias to native exception classes when native is loaded, so callers can catch one type regardless of backend:
 
-## Performance gates
+```python
+from eventflow_core.errors import BucketError, FuseError
+```
 
-CI runs environment-gated speedup tests to ensure the native kernels remain faster than their Python references. These tests compare both implementations on the same runner and assert minimum speedup ratios using time.perf_counter with warmups, multiple reps, and median aggregation.
+The native module also exposes a minimal synchronous logging bridge:
 
-- Enablement:
-  - Gates run only when EF_BENCH_GATE=1 and the native module is available.
-  - Thresholds are configurable via env vars.
+```python
+from eventflow_core._rust import native, set_log_sink
 
-- Defaults used in CI:
-  - CORE_BUCKET_MIN=1.5
-  - CORE_FUSE_MIN=1.5
+def sink(level, message):
+    print(f"[{level}] {message}")
 
-- Run locally:
-  - export EF_NATIVE=1 EF_BENCH_GATE=1
-  - optional thresholds: export CORE_BUCKET_MIN=1.5 CORE_FUSE_MIN=1.5
-  - python -m pytest -q eventflow-core/tests/test_bench_gate_speedups.py
+set_log_sink(sink)
+native.log_emit("INFO", "hello from native")
+set_log_sink(None)
+```
 
-## Benchmarking quickstart
+Compute-heavy native paths generally avoid logging. Logging callbacks must run while the GIL is held.
 
-Local:
-- python -m pip install -U pytest pytest-benchmark
-- pytest -q eventflow-core/tests/test_bench_native.py -k bench --benchmark-only --benchmark-autosave
+## Tests and Gates
 
-CI:
-- Bench workflow uploads autosaved results from .benchmarks as artifacts:
-  - bench-core (eventflow-core)
-  - bench-modules (eventflow-modules)
+Pure Python/core tests:
 
-Artifacts contain JSON/CSV that can be compared across runs. Performance is currently non-gating.
+```bash
+python -m pytest -q eventflow-core/tests -rs
+```
 
-## Releasing
+Native parity and speedup gates:
 
-- Tagging conventions:
-  - vX.Y.Z → publish to PyPI
-  - vX.Y.ZrcN / vX.Y.ZaN / vX.Y.ZbN → publish to TestPyPI
-- Manual dispatch:
-  - GitHub Actions → "Release" → Run workflow with target=testpypi
-- Build targets (abi3 cp38+):
-  - macOS universal2 (arm64 + x86_64)
-  - manylinux_2_28: x86_64, aarch64
-  - musllinux_1_2: x86_64, aarch64
-  - Windows MSVC x64
-- Local dry-run (no publish):
-  - python -m pip install -U maturin
-  - cd eventflow-core && python -m maturin build -r
-- Notes:
-  - Wheels are abi3 (cp38+) and delocated via auditwheel/delocate by maturin.
-  - EF_NATIVE behavior remains unchanged; see section above.
+```bash
+python -m pip install -U maturin
+(cd eventflow-core && python -m maturin develop -r)
+
+EF_NATIVE=1 python -m pytest -q eventflow-core/tests/test_native_parity.py
+EF_NATIVE=1 EF_BENCH_GATE=1 CORE_BUCKET_MIN=1.5 CORE_FUSE_MIN=1.5 \
+  python -m pytest -q eventflow-core/tests/test_bench_gate_speedups.py
+```
+
+Benchmark-only run:
+
+```bash
+python -m pip install -U pytest pytest-benchmark
+python -m pytest -q eventflow-core/tests/test_bench_native.py -k bench --benchmark-only --benchmark-autosave
+```
+
+## Release Notes for Maintainers
+
+Release workflows target abi3 wheels for Python 3.8+ across macOS universal2, manylinux/musllinux, and Windows MSVC. Treat this as CI/release configuration, not proof that every local checkout has native acceleration available.
