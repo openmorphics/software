@@ -2,6 +2,13 @@
 members = [
     "eventflow-core/rust",
     "eventflow-modules/rust",
+    "vcfo/vcfo-core",
+    "vcfo/vcfo-runway",
+    "vcfo/vcfo-viz",
+    "vcfo/vcfo-reports",
+    "vcfo/vcfo-edu",
+    "vcfo/vcfo-cli",
+    "vcfo/vcfo-api",
 ]
 resolver = "2"
 
